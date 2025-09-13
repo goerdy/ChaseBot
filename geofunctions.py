@@ -100,16 +100,10 @@ async def Check_location(bot, user_id, lat, lon):
         if distance <= trap_range:
             current_pois_in_range.add(poi_id)
             
-            # Prüfe ob Interaktion bereits aktiv ist
-            if not is_interaction_active(user_id, poi_id):
-                logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite einer Falle (ID: {trap_id}, Team: {trap_team}, Distanz: {distance:.1f}m)")
-                
-                # Markiere Interaktion als aktiv und führe Handling aus
-                set_interaction_active(user_id, poi_id)
-                await handle_trap_interaction(bot, user_id, trap_id, trap_team, distance)
-                interactions_found = True
-            else:
-                logger_newLog("debug", "Check_location", f"Runner {user_id} ist noch in Reichweite der Falle {trap_id}, aber Interaktion bereits aktiv")
+            # Führe Fallen-Interaktion immer aus (keine "nur einmal" Logik)
+            logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite einer Falle (ID: {trap_id}, Team: {trap_team}, Distanz: {distance:.1f}m)")
+            await handle_trap_interaction(bot, user_id, trap_id, trap_team, distance)
+            interactions_found = True
     
     # Prüfe Wachtürme
     watchtowers = db_POI_get_by_type(game_id, 'WATCHTOWER')
@@ -122,15 +116,10 @@ async def Check_location(bot, user_id, lat, lon):
         if distance <= tower_range:
             current_pois_in_range.add(poi_id)
             
-            # Prüfe ob Interaktion bereits aktiv ist
-            if not is_interaction_active(user_id, poi_id):
-                logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite eines Wachturms (ID: {tower_id}, Team: {tower_team}, Distanz: {distance:.1f}m)")
-                
-                # Führe Handling aus (markiert Interaktion intern als aktiv)
-                await handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance)
-                interactions_found = True
-            else:
-                logger_newLog("debug", "Check_location", f"Runner {user_id} ist noch in Reichweite des Wachturms {tower_id}, aber Interaktion bereits aktiv")
+            # Führe Wachturm-Interaktion immer aus (keine "nur einmal" Logik)
+            logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite eines Wachturms (ID: {tower_id}, Team: {tower_team}, Distanz: {distance:.1f}m)")
+            await handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance)
+            interactions_found = True
     
     # Prüfe ob User POIs verlassen hat und entferne inaktive Interaktionen
     if user_id in active_interactions:
@@ -263,42 +252,35 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
     runner_lat = user_position[3]
     runner_lon = user_position[4]
     
-    # Prüfe ob es die erste Interaktion mit diesem Wachturm ist (Interaktion noch nicht aktiv)
-    poi_id = f"poi_{tower_id}"
-    is_first_interaction = not is_interaction_active(user_id, poi_id)
+    # 1. Benachrichtige das Team (immer)
+    try:
+        team_members = db_getTeamMembers(game_id, tower_team)
+        team_message = f"🔭 **Ein Runner ist in Reichweite eures Wachturms!**\n\n📍 **Position:** {runner_lat:.6f}, {runner_lon:.6f}\n📏 **Distanz:** {distance:.1f}m"
+        
+        for member in team_members:
+            try:
+                await bot.send_message(member[0], team_message)
+                logger_newLog("info", "handle_watchtower_interaction", f"Team-Benachrichtigung an {member[1]} ({member[0]}) gesendet")
+            except Exception as e:
+                logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Team-Benachrichtigung an {member[1]}: {str(e)}")
+    except Exception as e:
+        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Abrufen der Teammitglieder: {str(e)}")
     
-    if is_first_interaction:
-        # Markiere Interaktion als aktiv
-        set_interaction_active(user_id, poi_id)
-        # 1. Benachrichtige das Team (nur beim ersten Betreten)
-        try:
-            team_members = db_getTeamMembers(game_id, tower_team)
-            team_message = f"🔭 **Ein Runner ist in Reichweite eures Wachturms!**\n\n📍 **Position:** {runner_lat:.6f}, {runner_lon:.6f}\n📏 **Distanz:** {distance:.1f}m"
-            
-            for member in team_members:
-                try:
-                    await bot.send_message(member[0], team_message)
-                    logger_newLog("info", "handle_watchtower_interaction", f"Team-Benachrichtigung an {member[1]} ({member[0]}) gesendet")
-                except Exception as e:
-                    logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Team-Benachrichtigung an {member[1]}: {str(e)}")
-        except Exception as e:
-            logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Abrufen der Teammitglieder: {str(e)}")
-        
-        # 2. Benachrichtige den Gamemaster (nur beim ersten Betreten)
-        try:
-            gamemaster_message = f"🔭 **Wachturm hat Runner entdeckt!**\n\n👤 **Runner:** {username} ({user_id})\n🎯 **Team:** {tower_team}\n📍 **Position:** {runner_lat:.6f}, {runner_lon:.6f}\n📏 **Distanz:** {distance:.1f}m"
-            await bot.send_message(gamemaster_id, gamemaster_message)
-            logger_newLog("info", "handle_watchtower_interaction", f"Gamemaster-Benachrichtigung gesendet")
-        except Exception as e:
-            logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Gamemaster-Benachrichtigung: {str(e)}")
-        
-        # 3. Benachrichtige den Runner (nur beim ersten Betreten)
-        try:
-            runner_message = f"🔭 **Du wurdest von einem Wachturm entdeckt!**\n\n🎯 **Team:** {tower_team}\n📏 **Distanz:** {distance:.1f}m\n\n⚠️ Das Team wurde benachrichtigt!"
-            await bot.send_message(user_id, runner_message)
-            logger_newLog("info", "handle_watchtower_interaction", f"Runner-Benachrichtigung an {username} ({user_id}) gesendet")
-        except Exception as e:
-            logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Runner-Benachrichtigung: {str(e)}")
+    # 2. Benachrichtige den Gamemaster (immer)
+    try:
+        gamemaster_message = f"🔭 **Wachturm hat Runner entdeckt!**\n\n👤 **Runner:** {username} ({user_id})\n🎯 **Team:** {tower_team}\n📍 **Position:** {runner_lat:.6f}, {runner_lon:.6f}\n📏 **Distanz:** {distance:.1f}m"
+        await bot.send_message(gamemaster_id, gamemaster_message)
+        logger_newLog("info", "handle_watchtower_interaction", f"Gamemaster-Benachrichtigung gesendet")
+    except Exception as e:
+        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Gamemaster-Benachrichtigung: {str(e)}")
+    
+    # 3. Benachrichtige den Runner (immer)
+    try:
+        runner_message = f"🔭 **Du wurdest von einem Wachturm entdeckt!**\n\n🎯 **Team:** {tower_team}\n📏 **Distanz:** {distance:.1f}m\n\n⚠️ Das Team wurde benachrichtigt!"
+        await bot.send_message(user_id, runner_message)
+        logger_newLog("info", "handle_watchtower_interaction", f"Runner-Benachrichtigung an {username} ({user_id}) gesendet")
+    except Exception as e:
+        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Runner-Benachrichtigung: {str(e)}")
     
     # 4. Erstelle RUNNERWATCHTOWER POI-Eintrag (bei jeder Position in der Range)
     try:
