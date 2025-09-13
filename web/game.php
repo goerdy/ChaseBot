@@ -400,6 +400,7 @@ foreach ($game_data['players'] as $player) {
         
         // Spielfeld zeichnen
         const field = <?php echo json_encode($game_data['map']['field']); ?>;
+        let fieldBounds = null;
         if (field.corner1 && field.corner2 && field.corner3 && field.corner4) {
             const fieldCoords = [
                 [field.corner1.lat, field.corner1.lon],
@@ -413,6 +414,9 @@ foreach ($game_data['players'] as $player) {
                 weight: 3,
                 fillOpacity: 0.1
             }).addTo(map);
+            
+            // Bounds für Auto-Zoom berechnen
+            fieldBounds = L.latLngBounds(fieldCoords);
         }
         
         // Ziellinie zeichnen
@@ -527,6 +531,12 @@ foreach ($game_data['players'] as $player) {
                 }).addTo(map);
             }
         });
+        
+        // Auto-Zoom auf Spielfeld
+        if (fieldBounds) {
+            // Füge etwas Padding hinzu, damit das Spielfeld nicht am Rand klebt
+            map.fitBounds(fieldBounds, { padding: [20, 20] });
+        }
         
         // Auto-Refresh alle 30 Sekunden
         setInterval(() => {
