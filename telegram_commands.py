@@ -1273,6 +1273,14 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
         await bot.send_message(chat_id, "❌ Die Spieldauer ist nicht konfiguriert.\n\nBitte verwende `/fieldsetup` um eine Spieldauer zu setzen.")
         return
     
+    # Prüfe ob Spiel bereits läuft
+    from database import db_Game_getStatus
+    current_status = db_Game_getStatus(game_id)
+    if current_status in ['headstart', 'running']:
+        await bot.send_message(chat_id, f"❌ Das Spiel läuft bereits!\n\nAktueller Status: {current_status.capitalize()}\n\nVerwende `/endgame` um das Spiel zu beenden.")
+        logger_newLog("warning", "cmd_startgame", f"Spiel {game_id} bereits gestartet (Status: {current_status}) - Start abgebrochen")
+        return
+    
     # Setze Startzeit und Status
     from datetime import datetime
     start_time = datetime.now().isoformat()
