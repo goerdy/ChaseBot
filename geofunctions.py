@@ -297,6 +297,13 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
             logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Erstellen des RUNNERWATCHTOWER POI")
     except Exception as e:
         logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Erstellen des RUNNERWATCHTOWER POI: {str(e)}")
+    
+    # 5. Sende Karte mit hervorgehobenem Wachturm an das Team
+    try:
+        await send_watchtower_alert_map(bot, game_id, tower_id, tower_team, runner_lat, runner_lon, username)
+        logger_newLog("info", "handle_watchtower_interaction", f"Wachturm-Alert-Karte an Team {tower_team} gesendet")
+    except Exception as e:
+        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Wachturm-Alert-Karte: {str(e)}")
 
 async def send_trap_alert_map(bot, game_id, trap_id, trap_team, runner_lat, runner_lon, runner_username):
     """Sendet eine Karte mit hervorgehobener ausgelöster Falle an das Hunter-Team"""
@@ -445,6 +452,161 @@ def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner
             "username": runner_username,
             "is_alert": True,
             "alert_message": f"Runner {runner_username} hat die Falle ausgelöst!"
+        }
+    })
+    
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+async def send_watchtower_alert_map(bot, game_id, tower_id, tower_team, runner_lat, runner_lon, runner_username):
+    """Sendet eine Karte mit hervorgehobenem Wachturm an das Hunter-Team"""
+    try:
+        from database import db_Game_getField, db_getTeamMembers
+        from Map import Map_GenerateGeoJSON
+        from config import conf_getMapProvider
+        from Map_SendMap_LeafletHTML import Map_SendMap_LeafletHTML
+        from Map_SendMap_pyStaticmapPNG import Map_SendMap_pyStaticmapPNG
+        
+        # Hole Spieldaten
+        game_data = db_Game_getField(game_id)
+        if not game_data:
+            logger_newLog("error", "send_watchtower_alert_map", f"Spiel {game_id} nicht gefunden")
+            return
+        
+        # Hole Team-Mitglieder
+        team_members = db_getTeamMembers(game_id, tower_team)
+        if not team_members:
+            logger_newLog("error", "send_watchtower_alert_map", f"Keine Team-Mitglieder für Team {tower_team} gefunden")
+            return
+        
+        # Erstelle spezielles GeoJSON mit hervorgehobenem Wachturm
+        geojson = create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon, runner_username)
+        
+        # Sende Karte an alle Team-Mitglieder
+        map_provider = conf_getMapProvider()
+        for member in team_members:
+            try:
+                if map_provider == "Leaflet-HTML":
+                    await Map_SendMap_LeafletHTML(bot, member[0], game_data, geojson, {
+                        'role': 'hunter',
+                        'username': member[1],
+                        'team': tower_team
+                    })
+                elif map_provider == "py-staticmap-PNG":
+                    await Map_SendMap_pyStaticmapPNG(bot, member[0], game_data, geojson, {
+                        'role': 'hunter',
+                        'username': member[1],
+                        'team': tower_team
+                    })
+                else:
+                    # Fallback für andere Provider
+                    from Map import Map_SendMap
+                    await Map_SendMap(bot, member[0], member[0], member[1], game_id)
+                
+                logger_newLog("info", "send_watchtower_alert_map", f"Wachturm-Alert-Karte an {member[1]} ({member[0]}) gesendet")
+            except Exception as e:
+                logger_newLog("error", "send_watchtower_alert_map", f"Fehler beim Senden der Karte an {member[1]}: {str(e)}")
+                
+    except Exception as e:
+        logger_newLog("error", "send_watchtower_alert_map", f"Fehler beim Erstellen der Wachturm-Alert-Karte: {str(e)}")
+
+def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon, runner_username):
+    """Erstellt ein spezielles GeoJSON für Wachturm-Alert mit hervorgehobenem Wachturm"""
+    from database import db_POI_get_by_type
+    
+    # Spielfeld-Polygon
+    field_corners = [
+        [game_data[5], game_data[4]],
+        [game_data[7], game_data[6]],
+        [game_data[9], game_data[8]],
+        [game_data[11], game_data[10]],
+        [game_data[5], game_data[4]]
+    ]
+    
+    # Ziellinie
+    finishline = [
+        [game_data[13], game_data[12]],
+        [game_data[15], game_data[14]]
+    ]
+    
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [field_corners]
+            },
+            "properties": {
+                "name": game_data[1],
+                "featuretype": "field"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": finishline
+            },
+            "properties": {
+                "featuretype": "finishline"
+            }
+        }
+    ]
+    
+    # Hole alle Wachtürme und finde den ausgelösten
+    game_id = game_data[0]
+    watchtowers = db_POI_get_by_type(game_id, 'WATCHTOWER')
+    for watchtower in watchtowers:
+        if watchtower[0] == tower_id:  # tower_id stimmt überein
+            tower_id, tower_game_id, tower_type, tower_lat, tower_lon, tower_range, tower_team, tower_creator, tower_timestamp = watchtower
+            
+            # Hervorgehobener Wachturm (größer und mit spezieller Markierung)
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [tower_lon, tower_lat]
+                },
+                "properties": {
+                    "featuretype": "WATCHTOWER_ALERT",
+                    "team": tower_team,
+                    "range": tower_range,
+                    "creator_id": tower_creator,
+                    "timestamp": tower_timestamp,
+                    "is_alert": True,
+                    "alert_message": f"Wachturm entdeckt Runner {runner_username}!"
+                }
+            })
+            
+            # Reichweite-Kreis des Wachturms (hervorgehoben)
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [tower_lon, tower_lat]
+                },
+                "properties": {
+                    "featuretype": "WATCHTOWER_RANGE_ALERT",
+                    "range": tower_range,
+                    "is_alert_range": True
+                }
+            })
+            break
+    
+    # Runner-Position (hervorgehoben)
+    features.append({
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [runner_lon, runner_lat]
+        },
+        "properties": {
+            "featuretype": "RUNNER_ALERT",
+            "username": runner_username,
+            "is_alert": True,
+            "alert_message": f"Runner {runner_username} wurde vom Wachturm entdeckt!"
         }
     })
     
