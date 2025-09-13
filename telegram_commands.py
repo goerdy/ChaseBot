@@ -127,6 +127,13 @@ async def cmd_join(bot, chat_id, user_id, username, command_text):
         await bot.send_message(chat_id, "❌ Ungültige Game ID. Bitte gib eine Zahl ein.")
         return
     
+    # Prüfe ob das Spiel existiert
+    from database import db_Game_getField
+    game_data = db_Game_getField(game_id)
+    if not game_data:
+        await bot.send_message(chat_id, f"❌ Spiel {game_id} existiert nicht!\n💡 Verwende /listgames um verfügbare Spiele zu sehen.")
+        return
+    
     # Prüfe ob User existiert
     existing_user = db_User_get(user_id)
     if not existing_user:
