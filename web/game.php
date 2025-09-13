@@ -418,7 +418,9 @@ foreach ($game_data['players'] as $player) {
         
         // Spieler-Marker hinzufügen
         const players = <?php echo json_encode($visible_players); ?>;
+        console.log('Visible players:', players); // Debug-Ausgabe
         players.forEach(player => {
+            console.log('Player:', player.first_name, 'Location:', player.location); // Debug-Ausgabe
             if (player.location && player.location.lat && player.location.lon) {
                 let markerColor = '#95a5a6';
                 if (player.role === 'runner') markerColor = '#27ae60';

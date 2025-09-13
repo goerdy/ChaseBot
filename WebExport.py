@@ -212,10 +212,10 @@ def WebExport_GameData(game_id):
                 "role": player[4],
                 "team": player[5],
                 "location": {
-                    "lat": player[6],
-                    "lon": player[7],
-                    "timestamp": player[8]
-                } if player[6] else None,
+                    "lat": player[7],
+                    "lon": player[8],
+                    "timestamp": player[9]
+                } if player[7] and player[8] else None,
                 "last_seen": player[3],
                 "budget": player_budget if player_budget is not None else 0,
                 "token": player[10] if player[10] else None  # Player-Token direkt in Player-Info (jetzt Index 10)
