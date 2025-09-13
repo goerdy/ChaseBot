@@ -146,62 +146,7 @@ systemctl daemon-reload
 
 # Erstelle Konfigurationsdatei
 log_info "Erstelle Konfigurationsdatei..."
-cat > /home/chasebot/chasebot/config.env << 'EOF'
-# Telegram Bot Konfiguration
-TELEGRAM_API_KEY=YOUR_BOT_API_KEY_HERE
-ADMIN=YOUR_TELEGRAM_USERNAME
-LOGLEVEL=info
-DATABASE_FILE=chasebot.db
-DATABASE_PATH=./telegram_chase_bot.db
-LOG_LEVEL=INFO
-LOG_FILE=./telegram_chase_bot.log
-
-# Map Provider: Leaflet-HTML | py-staticmap-PNG | LokalMapServer-PNG
-MapProvider=py-staticmap-PNG
-SEND_IMAGE_AS_DOCUMENT=true
-PNGMAP_EXPORT_MAXSIZE=2500
-
-# Tile Provider für py-staticmap-PNG
-TILE_PROVIDER=OSM
-
-# Tile-Caching Einstellungen
-TILE_CACHING=true
-TILE_CACHE_DIR=tile_cache
-TILE_CACHE_MAX_SIZE=1000
-
-MAX_LOCATION_AGE_MINUTES=5
-
-# Shop Item Preise (Coins)
-RUNNER_SHOP1_PRICE=50
-RUNNER_SHOP2_PRICE=75
-RUNNER_SHOP3_PRICE=100
-RUNNER_SHOP4_PRICE=150
-HUNTER_SHOP1_PRICE=50
-HUNTER_SHOP2_PRICE=75
-HUNTER_SHOP3_PRICE=100
-HUNTER_SHOP4_PRICE=150
-
-# Shop Item Anzahlen (maximal kaufbar)
-RUNNER_SHOP1_AMOUNT=5
-RUNNER_SHOP2_AMOUNT=5
-RUNNER_SHOP3_AMOUNT=5
-RUNNER_SHOP4_AMOUNT=5
-HUNTER_SHOP1_AMOUNT=5
-HUNTER_SHOP2_AMOUNT=5
-HUNTER_SHOP3_AMOUNT=5
-HUNTER_SHOP4_AMOUNT=5
-
-# Startbudgets (Coins)
-RUNNER_START_BUDGET=1000
-HUNTER_START_BUDGET=1000
-
-# Shop Cooldown (Minuten zwischen Käufen)
-SHOP_COOLDOWN=1
-
-# POI Reichweiten (Meter)
-TRAP_RANGE_METERS=30
-WATCHTOWER_RANGE_METERS=150
-EOF
+cp /home/chasebot/chasebot/config.env.example /home/chasebot/chasebot/config.env
 
 # Setze Berechtigungen für config.env
 chown chasebot:chasebot /home/chasebot/chasebot/config.env
