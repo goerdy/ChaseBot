@@ -478,10 +478,10 @@ if ($token_type === 'gamemaster') {
             }).addTo(map);
         }
         
-        // Spieler-Marker hinzufügen
+        // Spieler-Marker hinzufügen (außer Gamemaster)
         const players = <?php echo json_encode($visible_players); ?>;
         players.forEach(player => {
-            if (player.location && player.location.lat && player.location.lon) {
+            if (player.location && player.location.lat && player.location.lon && player.role !== 'gamemaster') {
                 let markerIcon;
                 
                 if (player.role === 'runner') {
@@ -505,14 +505,6 @@ if ($token_type === 'gamemaster') {
                     markerIcon = L.divIcon({
                         className: 'player-marker',
                         html: `<div style="background-color: ${teamColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    });
-                } else if (player.role === 'gamemaster') {
-                    // Gamemaster: Lila Marker
-                    markerIcon = L.divIcon({
-                        className: 'player-marker',
-                        html: '<div style="background-color: #9b59b6; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
                         iconSize: [20, 20],
                         iconAnchor: [10, 10]
                     });
