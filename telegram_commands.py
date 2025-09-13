@@ -701,11 +701,17 @@ async def cmd_shop(bot, chat_id, user_id, username, command_text):
     team = existing_user[7]
     
     # Prüfe ob Spiel läuft
-    from database import db_Game_getStatus
+    from database import db_Game_getStatus, db_Game_getStartTime, db_Game_getRunnerHeadstart
     game_status = db_Game_getStatus(game_id)
     if game_status not in ['headstart', 'running']:
         await bot.send_message(chat_id, "❌ Der Shop ist nur während des Spiels verfügbar.")
         return
+    
+    # Prüfe Headstart für Hunter
+    if role == 'hunter':
+        if game_status == 'headstart':
+            await bot.send_message(chat_id, "⏳ Der Shop ist für Hunter noch nicht verfügbar.\n🦌 Runner haben noch Headstart - warte bis das Spiel richtig beginnt!")
+            return
     
     # Spezielle Ansicht für Gamemaster
     if role == 'gamemaster':
@@ -971,11 +977,17 @@ async def cmd_buy(bot, chat_id, user_id, username, command_text):
     team = existing_user[7]
     
     # Prüfe ob Spiel läuft
-    from database import db_Game_getStatus
+    from database import db_Game_getStatus, db_Game_getStartTime, db_Game_getRunnerHeadstart
     game_status = db_Game_getStatus(game_id)
     if game_status not in ['headstart', 'running']:
         await bot.send_message(chat_id, "❌ Der Shop ist nur während des Spiels verfügbar.")
         return
+    
+    # Prüfe Headstart für Hunter
+    if role == 'hunter':
+        if game_status == 'headstart':
+            await bot.send_message(chat_id, "⏳ Der Shop ist für Hunter noch nicht verfügbar.\n🦌 Runner haben noch Headstart - warte bis das Spiel richtig beginnt!")
+            return
     
     # Hole Wallet
     from database import db_Wallet_get
