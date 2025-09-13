@@ -1297,6 +1297,24 @@ def db_Wallet_get(game_id, wallet_type, name):
         if conn:
             conn.close()
 
+def db_Wallet_getBalance(game_id, wallet_type, name):
+    """Holt das Budget eines Wallets"""
+    conn = None
+    try:
+        conn = db_get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT budget FROM wallet WHERE game_id = ? AND type = ? AND name = ?', (game_id, wallet_type, name))
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+    except Exception as e:
+        logger_newLog("error", "db_Wallet_getBalance", f"Fehler: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
 def db_Wallet_create(game_id, wallet_type, name, budget):
     """Erstellt ein neues Wallet"""
     conn = None
