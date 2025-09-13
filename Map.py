@@ -281,6 +281,7 @@ async def Map_SendMap(bot, chat_id, user_id, username, game_id):
             user = db_getUserPosition(user_id)
             if user:
                 user_info = {
+                    'user_id': user_id,
                     'role': user[6],
                     'username': user[1] or user[2],  # username oder first_name
                     'team': user[2]
