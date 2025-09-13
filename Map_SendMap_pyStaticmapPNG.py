@@ -88,7 +88,7 @@ async def Map_SendMap_pyStaticmapPNG(bot, chat_id, game_data, geojson, user_info
                     props = feature['properties']
                     feature_type = props.get('featuretype')
                     
-                    if feature_type in ['TRAP', 'WATCHTOWER', 'RADARPING']:
+                    if feature_type in ['TRAP', 'WATCHTOWER', 'RADARPING', 'TRAP_TRIGGER_X', 'WATCHTOWER_DETECTION_X']:
                         coords = feature['geometry']['coordinates']
                         lat, lon = coords[1], coords[0]  # GeoJSON: [lon, lat]
                         pos = staticmaps.create_latlng(lat, lon)
@@ -103,11 +103,24 @@ async def Map_SendMap_pyStaticmapPNG(bot, chat_id, game_data, geojson, user_info
                         elif feature_type == 'RADARPING':
                             color = staticmaps.parse_color("#FF00FF")  # Magenta
                             size = 6
+                        elif feature_type == 'TRAP_TRIGGER_X':
+                            color = staticmaps.parse_color("#FF0000")  # Rot
+                            size = 15  # Größer für X-Markierung
+                        elif feature_type == 'WATCHTOWER_DETECTION_X':
+                            color = staticmaps.parse_color("#0000FF")  # Blau
+                            size = 15  # Größer für X-Markierung
                         else:
                             continue
                         
                         # Füge POI-Marker hinzu (außer WATCHTOWER, die werden als Ringe dargestellt)
-                        if feature_type != 'WATCHTOWER':
+                        if feature_type not in ['WATCHTOWER', 'TRAP_TRIGGER_X', 'WATCHTOWER_DETECTION_X']:
+                            context.add_object(staticmaps.Marker(
+                                pos,
+                                color=color,
+                                size=size
+                            ))
+                        elif feature_type in ['TRAP_TRIGGER_X', 'WATCHTOWER_DETECTION_X']:
+                            # Spezielle X-Markierung für Alert-Punkte
                             context.add_object(staticmaps.Marker(
                                 pos,
                                 color=color,

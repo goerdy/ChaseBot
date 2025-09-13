@@ -53,6 +53,18 @@ async def Map_SendMap_LeafletHTML(bot, chat_id, game_data, geojson, user_info=No
                 html: '<div style="background-color: #ff00ff; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
                 iconSize: [16, 16],
                 iconAnchor: [8, 8]
+            }),
+            TRAP_TRIGGER_X: L.divIcon({
+                className: 'poi-icon',
+                html: '<div style="background-color: #ff0000; width: 30px; height: 30px; border: 3px solid white; box-shadow: 0 0 10px rgba(255,0,0,0.8); display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;">✕</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            }),
+            WATCHTOWER_DETECTION_X: L.divIcon({
+                className: 'poi-icon',
+                html: '<div style="background-color: #0000ff; width: 30px; height: 30px; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,255,0.8); display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;">✕</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
             })
         };
         '''

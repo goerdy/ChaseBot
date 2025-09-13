@@ -387,7 +387,7 @@ async def send_trap_alert_map(bot, game_id, trap_id, trap_team, runner_lat, runn
 
 def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner_username):
     """Erstellt ein spezielles GeoJSON für Fallen-Alert mit hervorgehobener Falle"""
-    from database import db_POI_get_by_type
+    from database import db_POI_get_by_type, db_getRunners, db_getHunters
     
     # Spielfeld-Polygon
     field_corners = [
@@ -428,47 +428,85 @@ def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner
         }
     ]
     
-    # Hole alle Fallen und finde die ausgelöste
+    # Alle normalen POIs hinzufügen
     game_id = game_data[0]
+    
+    # Alle Fallen
     traps = db_POI_get_by_type(game_id, 'TRAP')
     for trap in traps:
-        if trap[0] == trap_id:  # trap_id stimmt überein
-            trap_id, trap_game_id, trap_type, trap_lat, trap_lon, trap_range, trap_team, trap_creator, trap_timestamp = trap
-            
-            # Hervorgehobene Falle (größer und mit spezieller Markierung)
-            features.append({
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [trap_lon, trap_lat]
-                },
-                "properties": {
-                    "featuretype": "TRAP_ALERT",
-                    "team": trap_team,
-                    "range": trap_range,
-                    "creator_id": trap_creator,
-                    "timestamp": trap_timestamp,
-                    "is_alert": True,
-                    "alert_message": f"Falle ausgelöst von {runner_username}!"
-                }
-            })
-            
-            # Reichweite-Kreis der Falle (hervorgehoben)
-            features.append({
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [trap_lon, trap_lat]
-                },
-                "properties": {
-                    "featuretype": "TRAP_RANGE_ALERT",
-                    "range": trap_range,
-                    "is_alert_range": True
-                }
-            })
-            break
+        trap_id_db, trap_game_id, trap_type, trap_lat, trap_lon, trap_range, trap_team, trap_creator, trap_timestamp = trap
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [trap_lon, trap_lat]
+            },
+            "properties": {
+                "featuretype": "TRAP",
+                "team": trap_team,
+                "range": trap_range,
+                "creator_id": trap_creator,
+                "timestamp": trap_timestamp,
+                "is_alert": trap_id_db == trap_id  # Markiere die ausgelöste Falle
+            }
+        })
     
-    # Runner-Position (hervorgehoben)
+    # Alle Wachtürme
+    watchtowers = db_POI_get_by_type(game_id, 'WATCHTOWER')
+    for watchtower in watchtowers:
+        tower_id, tower_game_id, tower_type, tower_lat, tower_lon, tower_range, tower_team, tower_creator, tower_timestamp = watchtower
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [tower_lon, tower_lat]
+            },
+            "properties": {
+                "featuretype": "WATCHTOWER",
+                "team": tower_team,
+                "range": tower_range,
+                "creator_id": tower_creator,
+                "timestamp": tower_timestamp
+            }
+        })
+    
+    # Alle Spieler hinzufügen
+    # Alle Runner
+    runners = db_getRunners(game_id)
+    for runner in runners:
+        if runner[3] is not None and runner[4] is not None:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [runner[4], runner[3]]  # lon, lat
+                },
+                "properties": {
+                    "featuretype": "RUNNER",
+                    "username": runner[1] or runner[2],
+                    "user_id": runner[0]
+                }
+            })
+    
+    # Alle Hunter
+    hunters = db_getHunters(game_id)
+    for hunter in hunters:
+        if hunter[3] is not None and hunter[4] is not None:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [hunter[4], hunter[3]]  # lon, lat
+                },
+                "properties": {
+                    "featuretype": "HUNTER",
+                    "username": hunter[1] or hunter[2],
+                    "user_id": hunter[0],
+                    "team": hunter[2]
+                }
+            })
+    
+    # Spezielle X-Markierung an der Falle-Auslösungsstelle
     features.append({
         "type": "Feature",
         "geometry": {
@@ -476,10 +514,10 @@ def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner
             "coordinates": [runner_lon, runner_lat]
         },
         "properties": {
-            "featuretype": "RUNNER_ALERT",
+            "featuretype": "TRAP_TRIGGER_X",
             "username": runner_username,
             "is_alert": True,
-            "alert_message": f"Runner {runner_username} hat die Falle ausgelöst!"
+            "alert_message": f"FALLE AUSGELÖST! Runner {runner_username} hat hier die Falle ausgelöst!"
         }
     })
     
@@ -542,7 +580,7 @@ async def send_watchtower_alert_map(bot, game_id, tower_id, tower_team, runner_l
 
 def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon, runner_username):
     """Erstellt ein spezielles GeoJSON für Wachturm-Alert mit hervorgehobenem Wachturm"""
-    from database import db_POI_get_by_type
+    from database import db_POI_get_by_type, db_getRunners, db_getHunters
     
     # Spielfeld-Polygon
     field_corners = [
@@ -583,47 +621,85 @@ def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon,
         }
     ]
     
-    # Hole alle Wachtürme und finde den ausgelösten
+    # Alle normalen POIs hinzufügen
     game_id = game_data[0]
+    
+    # Alle Fallen
+    traps = db_POI_get_by_type(game_id, 'TRAP')
+    for trap in traps:
+        trap_id, trap_game_id, trap_type, trap_lat, trap_lon, trap_range, trap_team, trap_creator, trap_timestamp = trap
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [trap_lon, trap_lat]
+            },
+            "properties": {
+                "featuretype": "TRAP",
+                "team": trap_team,
+                "range": trap_range,
+                "creator_id": trap_creator,
+                "timestamp": trap_timestamp
+            }
+        })
+    
+    # Alle Wachtürme
     watchtowers = db_POI_get_by_type(game_id, 'WATCHTOWER')
     for watchtower in watchtowers:
-        if watchtower[0] == tower_id:  # tower_id stimmt überein
-            tower_id, tower_game_id, tower_type, tower_lat, tower_lon, tower_range, tower_team, tower_creator, tower_timestamp = watchtower
-            
-            # Hervorgehobener Wachturm (größer und mit spezieller Markierung)
-            features.append({
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [tower_lon, tower_lat]
-                },
-                "properties": {
-                    "featuretype": "WATCHTOWER_ALERT",
-                    "team": tower_team,
-                    "range": tower_range,
-                    "creator_id": tower_creator,
-                    "timestamp": tower_timestamp,
-                    "is_alert": True,
-                    "alert_message": f"Wachturm entdeckt Runner {runner_username}!"
-                }
-            })
-            
-            # Reichweite-Kreis des Wachturms (hervorgehoben)
-            features.append({
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [tower_lon, tower_lat]
-                },
-                "properties": {
-                    "featuretype": "WATCHTOWER_RANGE_ALERT",
-                    "range": tower_range,
-                    "is_alert_range": True
-                }
-            })
-            break
+        tower_id_db, tower_game_id, tower_type, tower_lat, tower_lon, tower_range, tower_team, tower_creator, tower_timestamp = watchtower
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [tower_lon, tower_lat]
+            },
+            "properties": {
+                "featuretype": "WATCHTOWER",
+                "team": tower_team,
+                "range": tower_range,
+                "creator_id": tower_creator,
+                "timestamp": tower_timestamp,
+                "is_alert": tower_id_db == tower_id  # Markiere den ausgelösten Wachturm
+            }
+        })
     
-    # Runner-Position (hervorgehoben)
+    # Alle Spieler hinzufügen
+    # Alle Runner
+    runners = db_getRunners(game_id)
+    for runner in runners:
+        if runner[3] is not None and runner[4] is not None:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [runner[4], runner[3]]  # lon, lat
+                },
+                "properties": {
+                    "featuretype": "RUNNER",
+                    "username": runner[1] or runner[2],
+                    "user_id": runner[0]
+                }
+            })
+    
+    # Alle Hunter
+    hunters = db_getHunters(game_id)
+    for hunter in hunters:
+        if hunter[3] is not None and hunter[4] is not None:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [hunter[4], hunter[3]]  # lon, lat
+                },
+                "properties": {
+                    "featuretype": "HUNTER",
+                    "username": hunter[1] or hunter[2],
+                    "user_id": hunter[0],
+                    "team": hunter[2]
+                }
+            })
+    
+    # Spezielle X-Markierung an der Wachturm-Entdeckungsstelle
     features.append({
         "type": "Feature",
         "geometry": {
@@ -631,10 +707,10 @@ def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon,
             "coordinates": [runner_lon, runner_lat]
         },
         "properties": {
-            "featuretype": "RUNNER_ALERT",
+            "featuretype": "WATCHTOWER_DETECTION_X",
             "username": runner_username,
             "is_alert": True,
-            "alert_message": f"Runner {runner_username} wurde vom Wachturm entdeckt!"
+            "alert_message": f"WACHTURM ENTDECKT! Runner {runner_username} wurde hier vom Wachturm entdeckt!"
         }
     })
     
