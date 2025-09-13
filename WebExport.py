@@ -7,7 +7,7 @@ from ftplib import FTP_TLS
 from logger import logger_newLog
 from config import (conf_getWebExportEnabled, conf_getWebExportFtpHost, 
                    conf_getWebExportFtpUser, conf_getWebExportFtpPass, 
-                   conf_getWebExportFtpPath, conf_getAdminName)
+                   conf_getWebExportFtpPath, conf_getAdminName, conf_getWebExportUrl)
 from database import (db_WebExport_getAllGames, db_WebExport_getAllPlayers, 
                      db_WebExport_getGameById, db_WebExport_getPlayersByGameId,
                      db_WebExport_getPOIsByGameId, db_WebExport_getGameField,
@@ -24,6 +24,13 @@ def generate_token(length=8):
     import string
     characters = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(characters) for _ in range(length))
+
+def get_live_map_link(game_id, token):
+    """Generiert den Live-Map-Link für ein Spiel"""
+    base_url = conf_getWebExportUrl()
+    if not base_url.endswith('/'):
+        base_url += '/'
+    return f"{base_url}web/game.php?id={game_id}&token={token}"
 
 def generate_game_tokens(game_id):
     """Generiert alle Tokens für ein Spiel (Gamemaster, Teams, Runners)"""

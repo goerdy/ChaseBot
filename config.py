@@ -207,4 +207,8 @@ def conf_getWebExportUpdateInterval():
     try:
         return int(value)
     except ValueError:
-        return 60 
+        return 60
+
+def conf_getWebExportUrl():
+    """Gibt die Web-Export URL zurück"""
+    return os.getenv('WEBEXPORT_URL', 'https://example.com/ChaseBot/') 

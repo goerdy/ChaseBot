@@ -1415,13 +1415,19 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
             
             # Hole alle Runner
             runners = db_getRunners(game_id)
-            runner_message = f"🏁 Das Spiel ist gestartet!\n\n⏱️ Du hast {time_str} Zeit um das Ziel zu erreichen.\n\n🗺️ Sende `/map` um eine aktuelle Karte zu bekommen."
+            
+            # Live-Map-Links für alle Spieler generieren
+            from WebExport import get_live_map_link, db_User_getPlayerToken, db_TeamToken_get
             
             # Sende Nachricht an alle Runner
             runner_count = 0
             for runner in runners:
                 try:
                     runner_user_id = runner[0]  # user_id ist in Spalte 0
+                    runner_token = db_User_getPlayerToken(runner_user_id)
+                    live_map_link = get_live_map_link(game_id, runner_token) if runner_token else "Token nicht verfügbar"
+                    
+                    runner_message = f"🏁 Das Spiel ist gestartet!\n\n⏱️ Du hast {time_str} Zeit um das Ziel zu erreichen.\n\n🗺️ Sende `/map` um eine aktuelle Karte zu bekommen.\n\n🌐 Live-Map: {live_map_link}\n💡 Die Live-Karte aktualisiert sich automatisch und funktioniert auch auf Tablet/Handy!"
                     await bot.send_message(runner_user_id, runner_message)
                     # Sende Standard-Tastatur
                     await send_helpmessage(bot, runner_user_id, runner_user_id)
@@ -1432,11 +1438,15 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
             
             # Hole alle Hunter
             hunters = db_getHunters(game_id)
-            hunter_message = f"🏁 Das Spiel wurde gestartet!\n\nDie Runner haben {time_str} Zeit das Ziel zu erreichen.\nDu musst noch {headstart_minutes} Minuten warten, bis du die Verfolgung aufnehmen darfst."
             hunter_count = 0
             for hunter in hunters:
                 try:
                     hunter_user_id = hunter[0]  # user_id ist in Spalte 0
+                    hunter_team = hunter[2]  # team ist in Spalte 2
+                    team_token = db_TeamToken_get(game_id, hunter_team) if hunter_team else None
+                    live_map_link = get_live_map_link(game_id, team_token) if team_token else "Token nicht verfügbar"
+                    
+                    hunter_message = f"🏁 Das Spiel wurde gestartet!\n\nDie Runner haben {time_str} Zeit das Ziel zu erreichen.\nDu musst noch {headstart_minutes} Minuten warten, bis du die Verfolgung aufnehmen darfst.\n\n🌐 Live-Map: {live_map_link}\n💡 Die Live-Karte aktualisiert sich automatisch und funktioniert auch auf Tablet/Handy!"
                     await bot.send_message(hunter_user_id, hunter_message)
                     # Sende Standard-Tastatur
                     await send_helpmessage(bot, hunter_user_id, hunter_user_id)
@@ -1455,7 +1465,14 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
             # Sende Bestätigung an Gamemaster
             runner_list = "\n".join([f"• {runner[1] or f'User_{runner[0]}'}" for runner in runners])
             hunter_list = "\n".join([f"• {hunter[1] or f'User_{hunter[0]}'}" for hunter in hunters])
-            await bot.send_message(chat_id, f"✅ Spiel erfolgreich gestartet!\n⏱️ Spieldauer: {time_str}\n🏃 {runner_count} von {len(runners)} Runner benachrichtigt:\n{runner_list}\n\n🦊 {hunter_count} von {len(hunters)} Hunter benachrichtigt:\n{hunter_list}")
+            
+            # Live-Map-Link generieren
+            from WebExport import get_live_map_link, db_Game_getGamemasterToken
+            gamemaster_token = db_Game_getGamemasterToken(game_id)
+            live_map_link = get_live_map_link(game_id, gamemaster_token) if gamemaster_token else "Token nicht verfügbar"
+            
+            message = f"✅ Spiel erfolgreich gestartet!\n⏱️ Spieldauer: {time_str}\n🏃 {runner_count} von {len(runners)} Runner benachrichtigt:\n{runner_list}\n\n🦊 {hunter_count} von {len(hunters)} Hunter benachrichtigt:\n{hunter_list}\n\n🗺️ Live-Map: {live_map_link}\n💡 Die Live-Karte kann auch auf einem Tablet oder ähnlichem genutzt werden und aktualisiert oft schneller als die Karte in Telegram!"
+            await bot.send_message(chat_id, message)
         else:
             await bot.send_message(chat_id, "✅ Spiel gestartet, aber Spieldauer nicht konfiguriert.")
     else:
