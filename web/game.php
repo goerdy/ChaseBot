@@ -65,11 +65,13 @@ if (!$token_type) {
 // Spieler filtern basierend auf Token
 $visible_players = [];
 $visible_pois = [];
+$visible_watchtowers = []; // Wachtürme sind immer für alle sichtbar
 
 if ($token_type === 'gamemaster') {
     // Gamemaster sieht alle Spieler und POIs
     $visible_players = $game_data['players'];
     $visible_pois = $game_data['map']['pois'];
+    $visible_watchtowers = $game_data['map']['pois']; // Alle POIs inkl. Wachtürme
 } elseif ($token_type === 'hunter_team') {
     // Hunter-Team sieht nur eigenes Team und alle Runner
     foreach ($game_data['players'] as $player) {
@@ -77,10 +79,14 @@ if ($token_type === 'gamemaster') {
             $visible_players[] = $player;
         }
     }
-    // Nur POIs des eigenen Teams
+    // Nur POIs des eigenen Teams (außer Wachtürme)
     foreach ($game_data['map']['pois'] as $poi) {
         if ($poi['team'] === $team) {
             $visible_pois[] = $poi;
+        }
+        // Wachtürme sind immer sichtbar
+        if ($poi['type'] === 'WATCHTOWER') {
+            $visible_watchtowers[] = $poi;
         }
     }
 } elseif ($token_type === 'runner') {
@@ -91,7 +97,12 @@ if ($token_type === 'gamemaster') {
             break;
         }
     }
-    // Runner sieht keine POIs
+    // Runner sieht keine POIs außer Wachtürme
+    foreach ($game_data['map']['pois'] as $poi) {
+        if ($poi['type'] === 'WATCHTOWER') {
+            $visible_watchtowers[] = $poi;
+        }
+    }
 }
 
 // Spielzeit berechnen
@@ -418,9 +429,7 @@ foreach ($game_data['players'] as $player) {
         
         // Spieler-Marker hinzufügen
         const players = <?php echo json_encode($visible_players); ?>;
-        console.log('Visible players:', players); // Debug-Ausgabe
         players.forEach(player => {
-            console.log('Player:', player.first_name, 'Location:', player.location); // Debug-Ausgabe
             if (player.location && player.location.lat && player.location.lon) {
                 let markerColor = '#95a5a6';
                 if (player.role === 'runner') markerColor = '#27ae60';
@@ -444,13 +453,12 @@ foreach ($game_data['players'] as $player) {
             }
         });
         
-        // POI-Marker hinzufügen
+        // POI-Marker hinzufügen (Fallen, etc.)
         const pois = <?php echo json_encode($visible_pois); ?>;
         pois.forEach(poi => {
-            if (poi.lat && poi.lon) {
+            if (poi.lat && poi.lon && poi.type !== 'WATCHTOWER') {
                 let poiColor = '#f39c12';
-                if (poi.type === 'trap') poiColor = '#e74c3c';
-                else if (poi.type === 'watchtower') poiColor = '#3498db';
+                if (poi.type === 'TRAP') poiColor = '#e74c3c';
                 
                 const poiMarker = L.circleMarker([poi.lat, poi.lon], {
                     color: poiColor,
@@ -475,6 +483,48 @@ foreach ($game_data['players'] as $player) {
                         radius: poi.range_meters
                     }).addTo(map);
                 }
+            }
+        });
+        
+        // Wachtürme separat hinzufügen (immer sichtbar, in Team-Farbe)
+        const watchtowers = <?php echo json_encode($visible_watchtowers); ?>;
+        watchtowers.forEach(poi => {
+            if (poi.lat && poi.lon && poi.type === 'WATCHTOWER') {
+                // Team-Farben definieren
+                const teamColors = {
+                    'red': '#e74c3c',
+                    'blue': '#3498db',
+                    'green': '#27ae60',
+                    'yellow': '#f1c40f',
+                    'purple': '#9b59b6',
+                    'orange': '#e67e22'
+                };
+                
+                const teamColor = teamColors[poi.team] || '#3498db'; // Standard: Blau
+                
+                const watchtowerMarker = L.circleMarker([poi.lat, poi.lon], {
+                    color: teamColor,
+                    fillColor: teamColor,
+                    fillOpacity: 0.8,
+                    radius: 8,
+                    weight: 3
+                }).addTo(map);
+                
+                watchtowerMarker.bindPopup(`
+                    <strong>🗼 Wachturm</strong><br>
+                    Team: <span style="color: ${teamColor}; font-weight: bold;">${poi.team}</span><br>
+                    Reichweite: ${poi.range_meters}m<br>
+                    Erstellt: ${new Date(poi.timestamp).toLocaleString()}
+                `);
+                
+                // Reichweite-Kreis hinzufügen
+                L.circle([poi.lat, poi.lon], {
+                    color: teamColor,
+                    fillColor: teamColor,
+                    fillOpacity: 0.1,
+                    radius: poi.range_meters,
+                    weight: 2
+                }).addTo(map);
             }
         });
         
