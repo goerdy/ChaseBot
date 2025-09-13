@@ -63,18 +63,26 @@ if (!$token_type) {
 }
 
 // Spieler filtern basierend auf Token
-$visible_players = [];
+$visible_players = []; // Für die Karte
 $visible_pois = [];
 $visible_watchtowers = []; // Wachtürme sind immer für alle sichtbar
 
 // Für die Spielerliste: Alle Spieler anzeigen (unabhängig von der Rolle)
-$visible_players = $game_data['players'];
+$all_players = $game_data['players'];
 
 if ($token_type === 'gamemaster') {
+    // Gamemaster sieht alle Spieler auf der Karte
+    $visible_players = $game_data['players'];
     // Gamemaster sieht alle POIs
     $visible_pois = $game_data['map']['pois'];
     $visible_watchtowers = $game_data['map']['pois']; // Alle POIs inkl. Wachtürme
 } elseif ($token_type === 'hunter_team') {
+    // Hunter-Team sieht nur eigenes Team auf der Karte (KEINE Runner!)
+    foreach ($game_data['players'] as $player) {
+        if ($player['role'] === 'hunter' && $player['team'] === $team) {
+            $visible_players[] = $player;
+        }
+    }
     // Nur POIs des eigenen Teams (außer Wachtürme)
     foreach ($game_data['map']['pois'] as $poi) {
         if ($poi['team'] === $team) {
@@ -86,6 +94,13 @@ if ($token_type === 'gamemaster') {
         }
     }
 } elseif ($token_type === 'runner') {
+    // Runner sieht nur sich selbst auf der Karte
+    foreach ($game_data['players'] as $player) {
+        if ($player['user_id'] === $user_id) {
+            $visible_players[] = $player;
+            break;
+        }
+    }
     // Runner sieht keine POIs außer Wachtürme
     foreach ($game_data['map']['pois'] as $poi) {
         if ($poi['type'] === 'WATCHTOWER') {
@@ -352,7 +367,7 @@ if ($token_type === 'gamemaster') {
                     $hunters_by_team = [];
                     $gamemaster = null;
                     
-                    foreach ($visible_players as $player) {
+                    foreach ($all_players as $player) {
                         if ($player['role'] === 'gamemaster') {
                             $gamemaster = $player;
                         } elseif ($player['role'] === 'runner') {
