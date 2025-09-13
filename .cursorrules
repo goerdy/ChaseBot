@@ -1,0 +1,18 @@
+# Cursor Rules für Python Projekt
+
+## Wichtige Regeln:
+1. **Keine Annahmen machen** - Nur das ausführen was explizit angefordert wird
+2. **Keine Alleingänge** - Bei Unklarheiten immer nachfragen
+3. **Nichts dazuerfinden** - Nur die gegebenen Anweisungen befolgen
+4. **Klare Ansagen befolgen** - Exakt das machen was verlangt wird
+5. **Datenbankzugriffe nur über Setter/Getter** - Keine direkten SQL-Befehle, nur über entsprechende Funktionen in database.py
+
+## Kommunikation:
+- Bei Unklarheiten sofort nachfragen
+- Keine alternativen Lösungen vorschlagen (außer explizit gewünscht)
+- Nur das implementieren was konkret angefordert wird
+
+## Python Projekt:
+- Sauberer, dokumentierter Code
+- Best Practices befolgen
+- Fehlerbehandlung implementieren wenn angefordert 

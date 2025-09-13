@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <title>Fieldsetup Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 60vh; margin-bottom: 10px; }
+        #output { font-family: monospace; width: 100%; margin-bottom: 10px; height: 100px; }
+        .copy-btn { padding: 5px 10px; }
+        .input-group { margin: 10px 0; }
+        .input-group label { display: inline-block; width: 120px; }
+        .input-group input { width: 80px; }
+        .controls { 
+            background: #f5f5f5; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        .control-group { 
+            display: inline-block; 
+            margin-right: 20px; 
+            vertical-align: top; 
+        }
+        .control-group label { 
+            display: block; 
+            font-weight: bold; 
+            margin-bottom: 5px; 
+        }
+        .btn {
+            padding: 8px 12px;
+            margin: 2px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: #fff;
+            cursor: pointer;
+        }
+        .btn:hover { background: #f0f0f0; }
+        .btn.active { background: #007cba; color: white; }
+        .rotation-controls { margin-top: 10px; }
+        .rotation-controls input { width: 100px; }
+    </style>
+</head>
+<body>
+    <h2>Fieldsetup Generator - Drehbares Spielfeld</h2>
+    <div id="map"></div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>Zeichnen:</label>
+            <button class="btn" id="drawBtn">Rechteck zeichnen</button>
+            <button class="btn" id="standardBtn">Standardfeld (10×20 km)</button>
+            <button class="btn" id="clearBtn">Löschen</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Rotation:</label>
+            <div class="rotation-controls">
+                <input type="range" id="rotationSlider" min="0" max="360" value="0" step="1">
+                <span id="rotationValue">0°</span>
+            </div>
+            <button class="btn" id="rotateLeftBtn">Links drehen (-15°)</button>
+            <button class="btn" id="rotateRightBtn">Rechts drehen (+15°)</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Ziellinie:</label>
+            <select id="finishLineSelect" class="btn" style="width: 120px;">
+                <option value="">Bitte wählen...</option>
+                <option value="0">AB (Ecke A → B)</option>
+                <option value="1">BC (Ecke B → C)</option>
+                <option value="2">CD (Ecke C → D)</option>
+                <option value="3">DA (Ecke D → A)</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Größe:</label>
+            <button class="btn" id="resizeBtn">Größe ändern</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Position:</label>
+            <button class="btn" id="moveBtn">Verschieben</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Spielfeld-Dimensionen:</label>
+            <div id="fieldDimensions" style="font-size: 12px; color: #666; margin-top: 5px;">
+                Noch nicht gezeichnet
+            </div>
+        </div>
+    </div>
+    
+    <div class="input-group">
+        <label>Spieldauer:</label>
+        <input id="duration_hours" type="number" placeholder="1" value="1" min="0" max="24" style="width: 60px;">
+        <span>h</span>
+        <input id="duration_minutes" type="number" placeholder="0" value="0" min="0" max="59" style="width: 60px;">
+        <span>min</span>
+    </div>
+    
+    <div class="input-group">
+        <label>Vorsprung:</label>
+        <input id="headstart_hours" type="number" placeholder="0" value="0" min="0" max="24" style="width: 60px;">
+        <span>h</span>
+        <input id="headstart_minutes" type="number" placeholder="5" value="5" min="0" max="59" style="width: 60px;">
+        <span>min</span>
+    </div>
+    
+    <textarea id="output" readonly placeholder="Zeichne zuerst ein Spielfeld..."></textarea>
+    <button class="copy-btn" onclick="copyFieldsetup()">Kopieren</button>
+    
+    <p><strong>Anleitung:</strong><br>
+    1. Klicke "Rechteck zeichnen" und ziehe ein Rechteck auf der Karte<br>
+    2. Nutze die Rotations-Steuerung um das Rechteck zu drehen<br>
+    3. Klicke auf eine der vier Kanten, um die Ziellinie festzulegen<br>
+    4. Kopiere den Befehl unten</p>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map').setView([53.6, 7.9], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let drawnItems = new L.FeatureGroup().addTo(map);
+        let finishLineLayer = null;
+        let finishLineIdx = null;
+        let rectangleCorners = [];
+        let rectangleLayer = null;
+        let cornerLabels = []; // Für Ecken-Beschriftungen
+        let isDrawing = false;
+        let isMoving = false;
+        let isResizing = false;
+        let drawingStart = null;
+        let moveStart = null;
+        let resizeStart = null;
+        let rectangleSize = { width: 0, height: 0 }; // Wird später ersetzt
+        let originalCorners = []; // Speichere die ursprünglichen Ecken
+        let resizeHandle = null; // Für Resize-Handle
+        let resizeHandles = []; // Für Resize-Grabber an den Ecken
+        let selectedHandle = null; // Welcher Grabber wird gezogen
+
+        // --- NEUE Zentrale Rechteck-Datenstruktur ---
+        let rectangleCenter = null; // {lat, lng}
+        let rectangleWidth = 0;     // Meter
+        let rectangleHeight = 0;    // Meter
+        let rectangleRotation = 0;  // Grad
+
+        // Hilfsfunktion: Berechne die vier Ecken eines Rechtecks aus center, width, height, rotation
+        function getRectangleCorners(center, width, height, rotationDeg) {
+            // Rotation in Radiant
+            let rot = rotationDeg * Math.PI / 180;
+            // Halbe Seitenlängen
+            let w2 = width / 2;
+            let h2 = height / 2;
+            // Eckpunkte im lokalen System (x, y)
+            let localCorners = [
+                {x: -w2, y: -h2}, // A (unten links)
+                {x:  w2, y: -h2}, // B (unten rechts)
+                {x:  w2, y:  h2}, // C (oben rechts)
+                {x: -w2, y:  h2}  // D (oben links)
+            ];
+            // Drehe und verschiebe ins Weltkoordinatensystem
+            let corners = localCorners.map(c => {
+                let xRot = c.x * Math.cos(rot) - c.y * Math.sin(rot);
+                let yRot = c.x * Math.sin(rot) + c.y * Math.cos(rot);
+                // Umrechnung in Lat/Lng
+                let latlng = localMetersToLatLng(xRot, yRot, center.lat, center.lng);
+                return [latlng.lat, latlng.lng];
+            });
+            return corners;
+        }
+
+        // Event-Listener für Buttons
+        document.getElementById('drawBtn').addEventListener('click', startDrawing);
+        document.getElementById('standardBtn').addEventListener('click', placeStandardField);
+        document.getElementById('clearBtn').addEventListener('click', clearAll);
+        document.getElementById('rotateLeftBtn').addEventListener('click', () => rotateRectangle(-15));
+        document.getElementById('rotateRightBtn').addEventListener('click', () => rotateRectangle(15));
+        document.getElementById('resizeBtn').addEventListener('click', toggleResizeMode);
+        document.getElementById('moveBtn').addEventListener('click', toggleMoveMode);
+        document.getElementById('finishLineSelect').addEventListener('change', onFinishLineChange);
+        document.getElementById('rotationSlider').addEventListener('input', function() {
+            rectangleRotation = parseInt(this.value);
+            document.getElementById('rotationValue').textContent = rectangleRotation + '°';
+            drawRectangle();
+        });
+
+        // Maus-Events für das Zeichnen
+        map.on('mousedown', onMouseDown);
+        map.on('mousemove', onMouseMove);
+        map.on('mouseup', onMouseUp);
+
+        function startDrawing() {
+            isDrawing = true;
+            isMoving = false;
+            isResizing = false;
+            document.getElementById('drawBtn').classList.add('active');
+            document.getElementById('moveBtn').classList.remove('active');
+            document.getElementById('resizeBtn').classList.remove('active');
+            map.getContainer().style.cursor = 'crosshair';
+            // Deaktiviere Karten-Navigation während des Zeichnens
+            map.dragging.disable();
+            map.touchZoom.disable();
+            map.doubleClickZoom.disable();
+            map.scrollWheelZoom.disable();
+            map.boxZoom.disable();
+            map.keyboard.disable();
+            // Entferne Resize-Grabber
+            removeResizeHandles();
+        }
+
+        function clearAll() {
+            drawnItems.clearLayers();
+            rectangleLayer = null;
+            finishLineLayer = null;
+            finishLineIdx = null;
+            rectangleCorners = [];
+            originalCorners = [];
+            cornerLabels = [];
+            rectangleCenter = null;
+            rectangleWidth = 0;
+            rectangleHeight = 0;
+            rectangleRotation = 0;
+            document.getElementById('rotationSlider').value = 0;
+            document.getElementById('rotationValue').textContent = '0°';
+            document.getElementById('finishLineSelect').value = '';
+            document.getElementById('drawBtn').classList.remove('active');
+            map.getContainer().style.cursor = '';
+            // Reaktiviere Karten-Navigation
+            map.dragging.enable();
+            map.touchZoom.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+            map.boxZoom.enable();
+            map.keyboard.enable();
+            updateOutput();
+        }
+
+        function onFinishLineChange() {
+            let select = document.getElementById('finishLineSelect');
+            finishLineIdx = select.value === '' ? null : parseInt(select.value);
+            drawFinishLines();
+            updateOutput();
+        }
+
+        function drawCornerLabels() {
+            // Entferne alte Ecken-Beschriftungen
+            cornerLabels.forEach(label => {
+                if (drawnItems.hasLayer(label)) {
+                    drawnItems.removeLayer(label);
+                }
+            });
+            cornerLabels = [];
+            
+            // Zeichne neue Ecken-Beschriftungen
+            if (rectangleCorners.length === 4) {
+                const labels = ['A', 'B', 'C', 'D'];
+                for (let i = 0; i < 4; i++) {
+                    let corner = rectangleCorners[i];
+                    let label = L.marker([corner[0], corner[1]], {
+                        icon: L.divIcon({
+                            className: 'corner-label',
+                            html: '<div style="background: white; border: 2px solid red; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: red;">' + labels[i] + '</div>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(drawnItems);
+                    cornerLabels.push(label);
+                }
+            }
+        }
+
+        function toggleResizeMode() {
+            if (!rectangleCorners.length) {
+                alert('Bitte zeichne zuerst ein Rechteck');
+                return;
+            }
+            
+            isResizing = !isResizing;
+            isDrawing = false;
+            isMoving = false;
+            
+            // Aktualisiere Button-Zustände
+            document.getElementById('drawBtn').classList.remove('active');
+            document.getElementById('moveBtn').classList.remove('active');
+            document.getElementById('resizeBtn').classList.toggle('active');
+            
+            // Zeige/Verstecke Resize-Grabber
+            if (isResizing) {
+                drawResizeHandles();
+                map.getContainer().style.cursor = 'default';
+            } else {
+                removeResizeHandles();
+                map.getContainer().style.cursor = '';
+            }
+        }
+
+        function drawResizeHandles() {
+            removeResizeHandles();
+            if (rectangleCorners.length === 4) {
+                // Grabber für Breite (Ecke A)
+                let rotA = -rectangleRotation;
+                let handleA = L.marker([rectangleCorners[0][0], rectangleCorners[0][1]], {
+                    icon: L.divIcon({
+                        className: 'resize-handle',
+                        html: `<div style=\"background: #fff; border: 2px solid #007cba; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #007cba; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transform: rotate(${rotA}deg);\">&#8596;</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(drawnItems);
+                handleA.on('mousedown', function(e) {
+                    e.originalEvent.preventDefault();
+                    e.originalEvent.stopPropagation();
+                    selectedHandle = 'width';
+                    map.getContainer().style.cursor = 'ew-resize';
+                });
+                resizeHandles.push(handleA);
+                // Grabber für Höhe (Ecke D)
+                let rotD = -rectangleRotation;
+                let handleD = L.marker([rectangleCorners[3][0], rectangleCorners[3][1]], {
+                    icon: L.divIcon({
+                        className: 'resize-handle',
+                        html: `<div style=\"background: #fff; border: 2px solid #00baba; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #00baba; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transform: rotate(${rotD}deg);\">&#8597;</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(drawnItems);
+                handleD.on('mousedown', function(e) {
+                    e.originalEvent.preventDefault();
+                    e.originalEvent.stopPropagation();
+                    selectedHandle = 'height';
+                    map.getContainer().style.cursor = 'ns-resize';
+                });
+                resizeHandles.push(handleD);
+            }
+        }
+
+        function removeResizeHandles() {
+            resizeHandles.forEach(handle => {
+                if (drawnItems.hasLayer(handle)) {
+                    drawnItems.removeLayer(handle);
+                }
+            });
+            resizeHandles = [];
+            selectedHandle = null;
+        }
+
+        function toggleMoveMode() {
+            if (!rectangleCorners.length) {
+                alert('Bitte zeichne zuerst ein Rechteck');
+                return;
+            }
+            
+            isMoving = !isMoving;
+            isDrawing = false;
+            isResizing = false;
+            
+            // Aktualisiere Button-Zustände
+            document.getElementById('drawBtn').classList.remove('active');
+            document.getElementById('resizeBtn').classList.remove('active');
+            document.getElementById('moveBtn').classList.toggle('active');
+            
+            // Entferne Resize-Grabber
+            removeResizeHandles();
+            
+            // Aktualisiere Cursor
+            if (isMoving) {
+                map.getContainer().style.cursor = 'move';
+                // Deaktiviere Karten-Navigation während des Verschiebens
+                map.dragging.disable();
+                map.touchZoom.disable();
+                map.doubleClickZoom.disable();
+                map.scrollWheelZoom.disable();
+                map.boxZoom.disable();
+                map.keyboard.disable();
+            } else {
+                map.getContainer().style.cursor = '';
+                // Reaktiviere Karten-Navigation
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+                map.boxZoom.enable();
+                map.keyboard.enable();
+            }
+        }
+
+        // --- ZEICHNEN ---
+        function onMouseDown(e) {
+            if (isDrawing) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                drawingStart = e.latlng;
+            } else if (isMoving && rectangleCenter) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                moveStart = e.latlng;
+                moveStartCenter = { ...rectangleCenter };
+            } else if (isResizing && selectedHandle !== null) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                resizeStart = e.latlng;
+                resizeStartWidth = rectangleWidth;
+                resizeStartHeight = rectangleHeight;
+                resizeStartCorners = getRectangleCorners(rectangleCenter, rectangleWidth, rectangleHeight, rectangleRotation);
+            }
+        }
+
+        function onMouseMove(e) {
+            if (isDrawing && drawingStart) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                let bounds = L.latLngBounds(drawingStart, e.latlng);
+                let center = bounds.getCenter();
+                let width = calculateDistance(bounds.getSouthWest().lat, bounds.getSouthWest().lng, bounds.getSouthEast().lat, bounds.getSouthEast().lng);
+                let height = calculateDistance(bounds.getSouthWest().lat, bounds.getSouthWest().lng, bounds.getNorthWest().lat, bounds.getNorthWest().lng);
+                rectangleCenter = center;
+                rectangleWidth = width;
+                rectangleHeight = height;
+                rectangleRotation = 0;
+                drawRectangle();
+            } else if (isMoving && moveStart) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                let deltaLat = e.latlng.lat - moveStart.lat;
+                let deltaLng = e.latlng.lng - moveStart.lng;
+                rectangleCenter = {
+                    lat: moveStartCenter.lat + deltaLat,
+                    lng: moveStartCenter.lng + deltaLng
+                };
+                drawRectangle();
+            } else if (isResizing && resizeStart && selectedHandle !== null) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                let localNow = latLngToLocalMeters(e.latlng.lat, e.latlng.lng, rectangleCenter.lat, rectangleCenter.lng);
+                let angle = (-rectangleRotation * Math.PI) / 180;
+                if (selectedHandle === 'width') {
+                    // Breite ändern (wie bisher)
+                    let dx = localNow.x * Math.cos(angle) - localNow.y * Math.sin(angle);
+                    let newWidth = Math.abs(dx) * 2;
+                    if (newWidth < 10) newWidth = 10;
+                    rectangleWidth = newWidth;
+                } else if (selectedHandle === 'height') {
+                    // Höhe ändern
+                    let dy = localNow.x * Math.sin(angle) + localNow.y * Math.cos(angle);
+                    let newHeight = Math.abs(dy) * 2;
+                    if (newHeight < 10) newHeight = 10;
+                    rectangleHeight = newHeight;
+                }
+                drawRectangle();
+            }
+        }
+
+        function onMouseUp(e) {
+            if (isDrawing && drawingStart) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                isDrawing = false;
+                document.getElementById('drawBtn').classList.remove('active');
+                map.getContainer().style.cursor = '';
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+                map.boxZoom.enable();
+                map.keyboard.enable();
+                drawRectangle();
+                drawFinishLines();
+                drawCornerLabels();
+                updateFieldDimensions();
+                if (isResizing) drawResizeHandles();
+                updateOutput();
+                drawingStart = null;
+            } else if (isMoving && moveStart) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                drawRectangle();
+                drawFinishLines();
+                drawCornerLabels();
+                updateFieldDimensions();
+                if (isResizing) drawResizeHandles();
+                updateOutput();
+                moveStart = null;
+            } else if (isResizing && resizeStart && selectedHandle !== null) {
+                e.originalEvent.preventDefault();
+                e.originalEvent.stopPropagation();
+                drawRectangle();
+                drawFinishLines();
+                drawCornerLabels();
+                updateFieldDimensions();
+                if (isResizing) drawResizeHandles();
+                updateOutput();
+                resizeStart = null;
+                selectedHandle = null;
+                map.getContainer().style.cursor = 'default';
+            }
+        }
+
+        function createRotatableRectangle(bounds) {
+            // Berechne Mittelpunkt
+            let center = bounds.getCenter();
+            // Breite/Höhe in Meter (ungefähr)
+            let width = calculateDistance(bounds.getSouthWest().lat, bounds.getSouthWest().lng, bounds.getSouthEast().lat, bounds.getSouthEast().lng);
+            let height = calculateDistance(bounds.getSouthWest().lat, bounds.getSouthWest().lng, bounds.getNorthWest().lat, bounds.getNorthWest().lng);
+            rectangleCenter = center;
+            rectangleWidth = width;
+            rectangleHeight = height;
+            rectangleRotation = 0;
+            drawRectangle();
+            drawFinishLines();
+            drawCornerLabels();
+            updateFieldDimensions();
+            if (isResizing) drawResizeHandles();
+            updateOutput();
+        }
+
+        function drawRectangle() {
+            // Berechne Ecken aus den aktuellen Parametern
+            rectangleCorners = getRectangleCorners(rectangleCenter, rectangleWidth, rectangleHeight, rectangleRotation);
+            // Zeichne
+            if (rectangleLayer) drawnItems.removeLayer(rectangleLayer);
+            rectangleLayer = L.polygon(rectangleCorners.map(c => L.latLng(c[0], c[1])), {
+                color: '#f00',
+                weight: 2,
+                fillOpacity: 0.1
+            }).addTo(drawnItems);
+        }
+
+        function rotateRectangle(angle) {
+            rectangleRotation += angle;
+            if (rectangleRotation < 0) rectangleRotation += 360;
+            if (rectangleRotation >= 360) rectangleRotation -= 360;
+            document.getElementById('rotationSlider').value = rectangleRotation;
+            document.getElementById('rotationValue').textContent = rectangleRotation + '°';
+            drawRectangle();
+            drawFinishLines();
+            drawCornerLabels();
+            updateFieldDimensions();
+            if (isResizing) drawResizeHandles();
+            updateOutput();
+        }
+
+        function updateRectangle() {
+            if (!rectangleCenter || originalCorners.length !== 4) return;
+            
+            // Entferne altes Rechteck
+            if (rectangleLayer) {
+                drawnItems.removeLayer(rectangleLayer);
+            }
+            
+            // Berechne gedrehte Ecken
+            let rotatedCorners = [];
+            let angleRad = (currentRotation * Math.PI) / 180;
+            
+            // Konvertiere zu lokalen Koordinaten (Meter) für korrekte Rotation
+            for (let corner of originalCorners) {
+                // Berechne lokale Koordinaten in Metern vom Zentrum
+                let localCoords = latLngToLocalMeters(corner[0], corner[1], rectangleCenter.lat, rectangleCenter.lng);
+                
+                // Rotation in lokalen Koordinaten
+                let rotatedX = localCoords.x * Math.cos(angleRad) - localCoords.y * Math.sin(angleRad);
+                let rotatedY = localCoords.x * Math.sin(angleRad) + localCoords.y * Math.cos(angleRad);
+                
+                // Konvertiere zurück zu Lat/Lng
+                let rotatedLatLng = localMetersToLatLng(rotatedX, rotatedY, rectangleCenter.lat, rectangleCenter.lng);
+                rotatedCorners.push([rotatedLatLng.lat, rotatedLatLng.lng]);
+            }
+            
+            // Aktualisiere rectangleCorners für die Ausgabe
+            rectangleCorners = rotatedCorners;
+            
+            // Zeichne neues Rechteck
+            let latlngs = rotatedCorners.map(c => L.latLng(c[0], c[1]));
+            rectangleLayer = L.polygon(latlngs, {
+                color: '#f00',
+                weight: 2,
+                fillOpacity: 0.1
+            }).addTo(drawnItems);
+            
+            drawFinishLines();
+            drawCornerLabels();
+            updateFieldDimensions();
+            // Aktualisiere Resize-Grabber wenn Resize-Modus aktiv ist
+            if (isResizing) {
+                drawResizeHandles();
+            }
+            updateOutput();
+        }
+
+        function updateRectangleWithCorners(corners) {
+            // Entferne altes Rechteck
+            if (rectangleLayer) {
+                drawnItems.removeLayer(rectangleLayer);
+            }
+            
+            // Zeichne neues Rechteck
+            let latlngs = corners.map(c => L.latLng(c[0], c[1]));
+            rectangleLayer = L.polygon(latlngs, {
+                color: '#f00',
+                weight: 2,
+                fillOpacity: 0.1
+            }).addTo(drawnItems);
+            
+            // Aktualisiere rectangleCorners für die Ausgabe
+            rectangleCorners = corners;
+            
+            drawFinishLines();
+            drawCornerLabels();
+            updateFieldDimensions();
+            updateOutput();
+        }
+
+        // Hilfsfunktionen für geografische Koordinaten-Transformation
+        function latLngToLocalMeters(lat, lng, centerLat, centerLng) {
+            // Ungefähre Konvertierung von Lat/Lng zu lokalen Metern
+            // 1 Grad Lat ≈ 111,320 km
+            // 1 Grad Lng ≈ 111,320 km * cos(lat)
+            const latToMeters = 111320; // Meter pro Grad Breitengrad
+            const lngToMeters = 111320 * Math.cos(centerLat * Math.PI / 180); // Meter pro Grad Längengrad
+            
+            let x = (lng - centerLng) * lngToMeters;
+            let y = (lat - centerLat) * latToMeters;
+            
+            return { x: x, y: y };
+        }
+
+        function localMetersToLatLng(x, y, centerLat, centerLng) {
+            // Ungefähre Konvertierung von lokalen Metern zu Lat/Lng
+            const latToMeters = 111320; // Meter pro Grad Breitengrad
+            const lngToMeters = 111320 * Math.cos(centerLat * Math.PI / 180); // Meter pro Grad Längengrad
+            
+            let lng = centerLng + (x / lngToMeters);
+            let lat = centerLat + (y / latToMeters);
+            
+            return { lat: lat, lng: lng };
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            // Haversine-Formel für Entfernungsberechnung
+            const R = 6371000; // Erdradius in Metern
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                     Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function updateFieldDimensions() {
+            if (rectangleCorners.length !== 4) {
+                document.getElementById('fieldDimensions').innerHTML = 'Noch nicht gezeichnet';
+                return;
+            }
+            
+            // Berechne Kantenlängen
+            const edges = [
+                { name: 'AB', from: 0, to: 1 },
+                { name: 'BC', from: 1, to: 2 },
+                { name: 'CD', from: 2, to: 3 },
+                { name: 'DA', from: 3, to: 0 }
+            ];
+            
+            let dimensions = [];
+            for (let edge of edges) {
+                const from = rectangleCorners[edge.from];
+                const to = rectangleCorners[edge.to];
+                const distance = calculateDistance(from[0], from[1], to[0], to[1]);
+                
+                // Formatiere Distanz
+                let distanceText;
+                if (distance < 1000) {
+                    distanceText = `${Math.round(distance)}m`;
+                } else {
+                    distanceText = `${(distance/1000).toFixed(1)}km`;
+                }
+                
+                dimensions.push(`${edge.name}: ${distanceText}`);
+            }
+            
+            // Zeige Dimensionen an
+            document.getElementById('fieldDimensions').innerHTML = dimensions.join('<br>');
+        }
+
+        function drawFinishLines() {
+            // Entferne alte Finish-Lines
+            drawnItems.eachLayer(function(layer) {
+                if (layer.options && layer.options.className === 'finish-line') {
+                    drawnItems.removeLayer(layer);
+                }
+            });
+            
+            // Zeichne vier Kanten als Polylines
+            if (rectangleCorners.length === 4) {
+                for (let i = 0; i < 4; i++) {
+                    let latlngs = [
+                        L.latLng(rectangleCorners[i][0], rectangleCorners[i][1]),
+                        L.latLng(rectangleCorners[(i+1)%4][0], rectangleCorners[(i+1)%4][1])
+                    ];
+                    let poly = L.polyline(latlngs, {
+                        color: (finishLineIdx === i) ? '#0c0' : '#f00',
+                        weight: (finishLineIdx === i) ? 5 : 3,
+                        opacity: 1,
+                        className: 'finish-line'
+                    }).addTo(drawnItems);
+                }
+            }
+        }
+
+        function updateOutput() {
+            let duration_hours = document.getElementById('duration_hours').value || '1';
+            let duration_minutes = document.getElementById('duration_minutes').value || '0';
+            let headstart_hours = document.getElementById('headstart_hours').value || '0';
+            let headstart_minutes = document.getElementById('headstart_minutes').value || '5';
+            
+            if (rectangleCorners.length !== 4 || finishLineIdx === null) {
+                document.getElementById('output').value = '';
+                return;
+            }
+            
+            // Spielfeld
+            let field = rectangleCorners.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';');
+            
+            // Ziellinie
+            let a = rectangleCorners[finishLineIdx];
+            let b = rectangleCorners[(finishLineIdx+1)%4];
+            let finish = `${a[0].toFixed(6)},${a[1].toFixed(6)};${b[0].toFixed(6)},${b[1].toFixed(6)}`;
+            
+            // JSON-Daten
+            let fieldsetupData = {
+                field_coords: field,
+                finish_coords: finish,
+                duration_minutes: parseInt(duration_hours) * 60 + parseInt(duration_minutes),
+                runner_headstart_minutes: parseInt(headstart_hours) * 60 + parseInt(headstart_minutes)
+            };
+            
+            let cmd = `/fieldsetup ${JSON.stringify(fieldsetupData)}`;
+            document.getElementById('output').value = cmd;
+        }
+
+        // Event-Listener für Eingabefelder
+        document.getElementById('duration_hours').addEventListener('input', updateOutput);
+        document.getElementById('duration_minutes').addEventListener('input', updateOutput);
+        document.getElementById('headstart_hours').addEventListener('input', updateOutput);
+        document.getElementById('headstart_minutes').addEventListener('input', updateOutput);
+
+        function copyFieldsetup() {
+            let output = document.getElementById('output');
+            output.select();
+            output.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+        }
+
+        // Standardfeld-Button-Handler
+        function placeStandardField() {
+            let center = map.getCenter();
+            rectangleCenter = { lat: center.lat, lng: center.lng };
+            rectangleWidth = 20000; // 20 km
+            rectangleHeight = 10000; // 10 km
+            rectangleRotation = 0;
+            drawRectangle();
+            drawFinishLines();
+            drawCornerLabels();
+            updateFieldDimensions();
+            if (isResizing) drawResizeHandles();
+            updateOutput();
+        }
+    </script>
+</body>
+</html>
