@@ -67,18 +67,14 @@ $visible_players = [];
 $visible_pois = [];
 $visible_watchtowers = []; // Wachtürme sind immer für alle sichtbar
 
+// Für die Spielerliste: Alle Spieler anzeigen (unabhängig von der Rolle)
+$visible_players = $game_data['players'];
+
 if ($token_type === 'gamemaster') {
-    // Gamemaster sieht alle Spieler und POIs
-    $visible_players = $game_data['players'];
+    // Gamemaster sieht alle POIs
     $visible_pois = $game_data['map']['pois'];
     $visible_watchtowers = $game_data['map']['pois']; // Alle POIs inkl. Wachtürme
 } elseif ($token_type === 'hunter_team') {
-    // Hunter-Team sieht nur eigenes Team (KEINE Runner!)
-    foreach ($game_data['players'] as $player) {
-        if ($player['role'] === 'hunter' && $player['team'] === $team) {
-            $visible_players[] = $player;
-        }
-    }
     // Nur POIs des eigenen Teams (außer Wachtürme)
     foreach ($game_data['map']['pois'] as $poi) {
         if ($poi['team'] === $team) {
@@ -90,13 +86,6 @@ if ($token_type === 'gamemaster') {
         }
     }
 } elseif ($token_type === 'runner') {
-    // Runner sieht nur sich selbst
-    foreach ($game_data['players'] as $player) {
-        if ($player['user_id'] === $user_id) {
-            $visible_players[] = $player;
-            break;
-        }
-    }
     // Runner sieht keine POIs außer Wachtürme
     foreach ($game_data['map']['pois'] as $poi) {
         if ($poi['type'] === 'WATCHTOWER') {
@@ -404,8 +393,10 @@ if ($token_type === 'gamemaster') {
                             
                             echo '<div class="player-item">';
                             echo '<div>';
-                            echo '<span class="player-name role-runner">' . htmlspecialchars($runner['first_name']) . ' (@' . htmlspecialchars($runner['username']) . ')</span>';
+                        echo '<span class="player-name role-runner">' . htmlspecialchars($runner['first_name']) . ' (@' . htmlspecialchars($runner['username']) . ')</span>';
+                        if ($token_type === 'gamemaster') {
                             echo ' <span class="player-budget coin">' . $runner['budget'] . ' Coins</span>';
+                        }
                             echo '</div>';
                             echo '<div class="status-indicator ' . $status_class . '"></div>';
                             echo '</div>';
@@ -415,7 +406,11 @@ if ($token_type === 'gamemaster') {
                     // Hunter-Teams anzeigen
                     foreach ($hunters_by_team as $team_name => $hunters) {
                         $team_budget = isset($game_data['teams_budget'][$team_name]) ? $game_data['teams_budget'][$team_name] : 0;
-                        echo '<div class="team-header">Team ' . htmlspecialchars($team_name) . ' <span class="coin">' . $team_budget . ' Coins</span></div>';
+                        echo '<div class="team-header">Team ' . htmlspecialchars($team_name);
+                        if ($token_type === 'gamemaster') {
+                            echo ' <span class="coin">' . $team_budget . ' Coins</span>';
+                        }
+                        echo '</div>';
                         
                         foreach ($hunters as $hunter) {
                             $last_seen = new DateTime($hunter['last_seen']);
