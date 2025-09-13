@@ -73,9 +73,9 @@ if ($token_type === 'gamemaster') {
     $visible_pois = $game_data['map']['pois'];
     $visible_watchtowers = $game_data['map']['pois']; // Alle POIs inkl. Wachtürme
 } elseif ($token_type === 'hunter_team') {
-    // Hunter-Team sieht nur eigenes Team und alle Runner
+    // Hunter-Team sieht nur eigenes Team (KEINE Runner!)
     foreach ($game_data['players'] as $player) {
-        if ($player['role'] === 'runner' || ($player['role'] === 'hunter' && $player['team'] === $team)) {
+        if ($player['role'] === 'hunter' && $player['team'] === $team) {
             $visible_players[] = $player;
         }
     }
