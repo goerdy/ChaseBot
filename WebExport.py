@@ -30,7 +30,7 @@ def get_live_map_link(game_id, token):
     base_url = conf_getWebExportUrl()
     if not base_url.endswith('/'):
         base_url += '/'
-    return f"{base_url}web/game.php?id={game_id}&token={token}"
+    return f"{base_url}game.php?id={game_id}&token={token}"
 
 def generate_game_tokens(game_id):
     """Generiert alle Tokens für ein Spiel (Gamemaster, Teams, Runners)"""
@@ -228,7 +228,7 @@ def WebExport_GameData(game_id):
                 if player[5] not in teams_budget:
                     teams_budget[player[5]] = player_budget if player_budget is not None else 0
         
-        # Gamemaster hinzufügen (falls nicht schon in players_data)
+        # Gamemaster hinzufügen oder Token aktualisieren
         gamemaster_id = game_data[2]
         gamemaster_in_players = any(p["user_id"] == gamemaster_id for p in players)
         
@@ -249,6 +249,12 @@ def WebExport_GameData(game_id):
                     "token": gamemaster_token
                 }
                 players.append(gamemaster_info)
+        else:
+            # Gamemaster ist schon in der Liste, aber Token aktualisieren
+            for player in players:
+                if player["user_id"] == gamemaster_id:
+                    player["token"] = gamemaster_token
+                    break
         
         # 7. Team-Tokens hinzufügen
         team_tokens_list = []
