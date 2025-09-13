@@ -122,6 +122,38 @@ foreach ($game_data['players'] as $player) {
         break;
     }
 }
+
+// Aktueller User basierend auf Token ermitteln
+$current_user = null;
+$current_user_role = 'Unbekannt';
+$current_user_team = null;
+
+if ($token_type === 'gamemaster') {
+    foreach ($game_data['players'] as $player) {
+        if ($player['role'] === 'gamemaster' && $player['token'] === $token) {
+            $current_user = $player;
+            $current_user_role = 'Gamemaster';
+            break;
+        }
+    }
+} elseif ($token_type === 'hunter_team') {
+    foreach ($game_data['players'] as $player) {
+        if ($player['role'] === 'hunter' && $player['team'] === $team) {
+            $current_user = $player;
+            $current_user_role = 'Hunter';
+            $current_user_team = $team;
+            break;
+        }
+    }
+} elseif ($token_type === 'runner') {
+    foreach ($game_data['players'] as $player) {
+        if ($player['role'] === 'runner' && $player['token'] === $token) {
+            $current_user = $player;
+            $current_user_role = 'Runner';
+            break;
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -305,6 +337,21 @@ foreach ($game_data['players'] as $player) {
                     <div>Spielzeit: <?php echo $elapsed_minutes; ?> Min</div>
                     <div>Verbleibend: <?php echo max(0, $remaining_minutes); ?> Min</div>
                 </div>
+                <?php if ($current_user): ?>
+                <div class="user-info" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #34495e;">
+                    <div style="font-weight: bold; color: #ecf0f1;">Eingeloggt als:</div>
+                    <div style="margin-top: 5px;">
+                        <span style="color: #3498db;"><?php echo htmlspecialchars($current_user['first_name']); ?></span>
+                        <span style="color: #95a5a6;">(@<?php echo htmlspecialchars($current_user['username']); ?>)</span>
+                    </div>
+                    <div style="margin-top: 3px; font-size: 0.9em;">
+                        <span style="color: #e74c3c; font-weight: bold;"><?php echo $current_user_role; ?></span>
+                        <?php if ($current_user_team): ?>
+                        <span style="color: #95a5a6;">- Team <?php echo htmlspecialchars($current_user_team); ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <div class="players-section">
