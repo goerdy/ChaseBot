@@ -23,28 +23,31 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     distance = R * c
     return distance
 
-def is_interaction_active(user_id, poi_id):
+def is_interaction_active(game_id, poi_id, user_id, poi_type):
     """Prüft ob eine Interaktion bereits aktiv ist"""
-    if user_id in active_interactions and poi_id in active_interactions[user_id]:
+    interaction_key = f"{game_id}_{poi_id}_{user_id}_{poi_type}"
+    if user_id in active_interactions and interaction_key in active_interactions[user_id]:
         return True
     return False
 
-def set_interaction_active(user_id, poi_id):
+def set_interaction_active(game_id, poi_id, user_id, poi_type):
     """Markiert eine Interaktion als aktiv"""
     from datetime import datetime
+    interaction_key = f"{game_id}_{poi_id}_{user_id}_{poi_type}"
     if user_id not in active_interactions:
         active_interactions[user_id] = {}
-    active_interactions[user_id][poi_id] = datetime.now().isoformat()
-    logger_newLog("debug", "set_interaction_active", f"Interaktion {poi_id} für User {user_id} als aktiv markiert")
+    active_interactions[user_id][interaction_key] = datetime.now().isoformat()
+    logger_newLog("debug", "set_interaction_active", f"Interaktion {interaction_key} für User {user_id} als aktiv markiert")
 
-def clear_interaction(user_id, poi_id):
+def clear_interaction(game_id, poi_id, user_id, poi_type):
     """Entfernt eine Interaktion aus dem aktiven Tracking"""
-    if user_id in active_interactions and poi_id in active_interactions[user_id]:
-        del active_interactions[user_id][poi_id]
+    interaction_key = f"{game_id}_{poi_id}_{user_id}_{poi_type}"
+    if user_id in active_interactions and interaction_key in active_interactions[user_id]:
+        del active_interactions[user_id][interaction_key]
         # Entferne leere User-Einträge
         if not active_interactions[user_id]:
             del active_interactions[user_id]
-        logger_newLog("debug", "clear_interaction", f"Interaktion {poi_id} für User {user_id} entfernt")
+        logger_newLog("debug", "clear_interaction", f"Interaktion {interaction_key} für User {user_id} entfernt")
 
 async def Check_location(bot, user_id, lat, lon):
     """Prüft die Position eines Spielers auf POI-Interaktionen
@@ -100,7 +103,7 @@ async def Check_location(bot, user_id, lat, lon):
         if distance <= trap_range:
             current_pois_in_range.add(poi_id)
             
-            # Führe Fallen-Interaktion immer aus (keine "nur einmal" Logik)
+            # Führe Fallen-Interaktion aus (first sight Logik in handle_trap_interaction)
             logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite einer Falle (ID: {trap_id}, Team: {trap_team}, Distanz: {distance:.1f}m)")
             await handle_trap_interaction(bot, user_id, trap_id, trap_team, distance)
             interactions_found = True
@@ -116,17 +119,26 @@ async def Check_location(bot, user_id, lat, lon):
         if distance <= tower_range:
             current_pois_in_range.add(poi_id)
             
-            # Führe Wachturm-Interaktion immer aus (keine "nur einmal" Logik)
+            # Führe Wachturm-Interaktion aus (first sight Logik in handle_watchtower_interaction)
             logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite eines Wachturms (ID: {tower_id}, Team: {tower_team}, Distanz: {distance:.1f}m)")
             await handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance)
             interactions_found = True
     
     # Prüfe ob User POIs verlassen hat und entferne inaktive Interaktionen
     if user_id in active_interactions:
-        for poi_id in list(active_interactions[user_id].keys()):
-            if poi_id not in current_pois_in_range:
-                logger_newLog("debug", "Check_location", f"Runner {user_id} hat POI {poi_id} verlassen")
-                clear_interaction(user_id, poi_id)
+        for interaction_key in list(active_interactions[user_id].keys()):
+            # Extrahiere POI-ID aus dem interaction_key (Format: game_id_poi_id_user_id_poi_type)
+            parts = interaction_key.split('_')
+            if len(parts) >= 4:
+                poi_id = f"poi_{parts[1]}"  # Rekonstruiere poi_id aus dem Key
+                if poi_id not in current_pois_in_range:
+                    logger_newLog("debug", "Check_location", f"Runner {user_id} hat POI {poi_id} verlassen")
+                    # Extrahiere game_id, poi_id, user_id und poi_type für clear_interaction
+                    game_id_from_key = parts[0]
+                    poi_id_from_key = parts[1]
+                    user_id_from_key = parts[2]
+                    poi_type_from_key = parts[3]
+                    clear_interaction(game_id_from_key, poi_id_from_key, user_id_from_key, poi_type_from_key)
     
     if not interactions_found:
         logger_newLog("debug", "Check_location", f"Runner {user_id} ist nicht in Reichweite von neuen POIs")
@@ -173,6 +185,11 @@ async def handle_trap_interaction(bot, user_id, trap_id, trap_team, distance):
     runner_lat = user_position[3]
     runner_lon = user_position[4]
     
+    # Prüfe ob bereits eine Interaktion aktiv ist (first sight)
+    if is_interaction_active(game_id, trap_id, user_id, "TRAP"):
+        logger_newLog("info", "handle_trap_interaction", f"Fallen-Interaktion bereits aktiv für Runner {username} ({user_id})")
+        return
+    
     # 1. Benachrichtige das Team (ohne Runner-Info)
     try:
         team_members = db_getTeamMembers(game_id, trap_team)
@@ -218,6 +235,9 @@ async def handle_trap_interaction(bot, user_id, trap_id, trap_team, distance):
         logger_newLog("info", "handle_trap_interaction", f"Fallen-Alert-Karte an Team {trap_team} gesendet")
     except Exception as e:
         logger_newLog("error", "handle_trap_interaction", f"Fehler beim Senden der Fallen-Alert-Karte: {str(e)}")
+    
+    # 6. Setze Interaktion als aktiv (first sight)
+    set_interaction_active(game_id, trap_id, user_id, "TRAP")
 
 async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance):
     """Behandelt Wachturm-Interaktionen
@@ -258,6 +278,11 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
     
     runner_lat = user_position[3]
     runner_lon = user_position[4]
+    
+    # Prüfe ob bereits eine Interaktion aktiv ist (first sight)
+    if is_interaction_active(game_id, tower_id, user_id, "WATCHTOWER"):
+        logger_newLog("info", "handle_watchtower_interaction", f"Wachturm-Interaktion bereits aktiv für Runner {username} ({user_id})")
+        return
     
     # 1. Benachrichtige das Team (immer)
     try:
@@ -304,6 +329,9 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
         logger_newLog("info", "handle_watchtower_interaction", f"Wachturm-Alert-Karte an Team {tower_team} gesendet")
     except Exception as e:
         logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Senden der Wachturm-Alert-Karte: {str(e)}")
+    
+    # 6. Setze Interaktion als aktiv (first sight)
+    set_interaction_active(game_id, tower_id, user_id, "WATCHTOWER")
 
 async def send_trap_alert_map(bot, game_id, trap_id, trap_team, runner_lat, runner_lon, runner_username):
     """Sendet eine Karte mit hervorgehobener ausgelöster Falle an das Hunter-Team"""
