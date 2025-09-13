@@ -126,8 +126,7 @@ async def Check_location(bot, user_id, lat, lon):
             if not is_interaction_active(user_id, poi_id):
                 logger_newLog("info", "Check_location", f"Runner {user_id} ist in Reichweite eines Wachturms (ID: {tower_id}, Team: {tower_team}, Distanz: {distance:.1f}m)")
                 
-                # Markiere Interaktion als aktiv und führe Handling aus
-                set_interaction_active(user_id, poi_id)
+                # Führe Handling aus (markiert Interaktion intern als aktiv)
                 await handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance)
                 interactions_found = True
             else:
@@ -269,6 +268,8 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
     is_first_interaction = not is_interaction_active(user_id, poi_id)
     
     if is_first_interaction:
+        # Markiere Interaktion als aktiv
+        set_interaction_active(user_id, poi_id)
         # 1. Benachrichtige das Team (nur beim ersten Betreten)
         try:
             team_members = db_getTeamMembers(game_id, tower_team)
