@@ -506,7 +506,7 @@ def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner
                 }
             })
     
-    # Spezielle X-Markierung an der Falle-Auslösungsstelle
+    # Schwarzer Marker an der Falle-Auslösungsstelle
     features.append({
         "type": "Feature",
         "geometry": {
@@ -514,7 +514,7 @@ def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner
             "coordinates": [runner_lon, runner_lat]
         },
         "properties": {
-            "featuretype": "TRAP_TRIGGER_X",
+            "featuretype": "TRAP_TRIGGER_POINT",
             "username": runner_username,
             "is_alert": True,
             "alert_message": f"FALLE AUSGELÖST! Runner {runner_username} hat hier die Falle ausgelöst!"
@@ -699,7 +699,7 @@ def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon,
                 }
             })
     
-    # Spezielle X-Markierung an der Wachturm-Entdeckungsstelle
+    # Schwarzer Marker an der Wachturm-Entdeckungsstelle
     features.append({
         "type": "Feature",
         "geometry": {
@@ -707,7 +707,7 @@ def create_watchtower_alert_geojson(game_data, tower_id, runner_lat, runner_lon,
             "coordinates": [runner_lon, runner_lat]
         },
         "properties": {
-            "featuretype": "WATCHTOWER_DETECTION_X",
+            "featuretype": "WATCHTOWER_DETECTION_POINT",
             "username": runner_username,
             "is_alert": True,
             "alert_message": f"WACHTURM ENTDECKT! Runner {runner_username} wurde hier vom Wachturm entdeckt!"
