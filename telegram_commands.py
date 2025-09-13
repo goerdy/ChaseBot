@@ -1417,7 +1417,8 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
             runners = db_getRunners(game_id)
             
             # Live-Map-Links für alle Spieler generieren
-            from WebExport import get_live_map_link, db_User_getPlayerToken, db_TeamToken_get
+            from WebExport import get_live_map_link
+            from database import db_User_getPlayerToken, db_TeamToken_get
             
             # Sende Nachricht an alle Runner
             runner_count = 0
@@ -1467,7 +1468,8 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
             hunter_list = "\n".join([f"• {hunter[1] or f'User_{hunter[0]}'}" for hunter in hunters])
             
             # Live-Map-Link generieren
-            from WebExport import get_live_map_link, db_Game_getGamemasterToken
+            from WebExport import get_live_map_link
+            from database import db_Game_getGamemasterToken
             gamemaster_token = db_Game_getGamemasterToken(game_id)
             live_map_link = get_live_map_link(game_id, gamemaster_token) if gamemaster_token else "Token nicht verfügbar"
             
