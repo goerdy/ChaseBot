@@ -92,6 +92,7 @@ async def Map_SendMap_pyStaticmapPNG(bot, chat_id, game_data, geojson, user_info
                         coords = feature['geometry']['coordinates']
                         lat, lon = coords[1], coords[0]  # GeoJSON: [lon, lat]
                         pos = staticmaps.create_latlng(lat, lon)
+                        logger_newLog("debug", "Map_SendMap_pyStaticmapPNG", f"Verarbeite POI: {feature_type} at {lat}, {lon}")
                         
                         # Bestimme Farbe und Größe basierend auf POI-Typ
                         if feature_type == 'TRAP':
@@ -105,15 +106,16 @@ async def Map_SendMap_pyStaticmapPNG(bot, chat_id, game_data, geojson, user_info
                             size = 6
                         elif feature_type == 'TRAP_TRIGGER_POINT':
                             color = staticmaps.parse_color("#000000")  # Schwarz
-                            size = 10  # Standard-Größe
+                            size = 15  # Größer für bessere Sichtbarkeit
                         elif feature_type == 'WATCHTOWER_DETECTION_POINT':
                             color = staticmaps.parse_color("#000000")  # Schwarz
-                            size = 10  # Standard-Größe
+                            size = 15  # Größer für bessere Sichtbarkeit
                         else:
                             continue
                         
                         # Füge POI-Marker hinzu (außer WATCHTOWER, die werden als Ringe dargestellt)
                         if feature_type != 'WATCHTOWER':
+                            logger_newLog("debug", "Map_SendMap_pyStaticmapPNG", f"Füge Marker hinzu: {feature_type}, Farbe: {color}, Größe: {size}")
                             context.add_object(staticmaps.Marker(
                                 pos,
                                 color=color,
