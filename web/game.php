@@ -482,16 +482,52 @@ if ($token_type === 'gamemaster') {
         const players = <?php echo json_encode($visible_players); ?>;
         players.forEach(player => {
             if (player.location && player.location.lat && player.location.lon) {
-                let markerColor = '#95a5a6';
-                if (player.role === 'runner') markerColor = '#27ae60';
-                else if (player.role === 'hunter') markerColor = '#e74c3c';
-                else if (player.role === 'gamemaster') markerColor = '#9b59b6';
+                let markerIcon;
                 
-                const marker = L.circleMarker([player.location.lat, player.location.lon], {
-                    color: markerColor,
-                    fillColor: markerColor,
-                    fillOpacity: 0.7,
-                    radius: 8
+                if (player.role === 'runner') {
+                    // Runner: Schwarzer Marker
+                    markerIcon = L.divIcon({
+                        className: 'player-marker',
+                        html: '<div style="background-color: #000000; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.8);"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+                } else if (player.role === 'hunter') {
+                    // Hunter: Teamfarbe
+                    const teamColors = {
+                        'red': '#e74c3c',
+                        'blue': '#3498db',
+                        'green': '#27ae60',
+                        'yellow': '#f1c40f',
+                        'purple': '#9b59b6'
+                    };
+                    const teamColor = teamColors[player.team] || '#95a5a6';
+                    markerIcon = L.divIcon({
+                        className: 'player-marker',
+                        html: `<div style="background-color: ${teamColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+                } else if (player.role === 'gamemaster') {
+                    // Gamemaster: Lila Marker
+                    markerIcon = L.divIcon({
+                        className: 'player-marker',
+                        html: '<div style="background-color: #9b59b6; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+                } else {
+                    // Fallback: Grauer Marker
+                    markerIcon = L.divIcon({
+                        className: 'player-marker',
+                        html: '<div style="background-color: #95a5a6; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+                }
+                
+                const marker = L.marker([player.location.lat, player.location.lon], {
+                    icon: markerIcon
                 }).addTo(map);
                 
                 marker.bindPopup(`
