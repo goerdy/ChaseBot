@@ -506,12 +506,13 @@ foreach ($game_data['players'] as $player) {
                 
                 const teamColor = teamColors[poi.team] || '#3498db'; // Standard: Blau
                 
-                const watchtowerMarker = L.circleMarker([poi.lat, poi.lon], {
+                // Wachturm ohne Mittelpunkt - nur äußerer Ring
+                const watchtowerMarker = L.circle([poi.lat, poi.lon], {
                     color: teamColor,
                     fillColor: teamColor,
-                    fillOpacity: 0.8,
+                    fillOpacity: 0.1,
                     radius: 8,
-                    weight: 3
+                    weight: 2
                 }).addTo(map);
                 
                 watchtowerMarker.bindPopup(`
