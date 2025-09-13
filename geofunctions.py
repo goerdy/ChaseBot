@@ -211,6 +211,13 @@ async def handle_trap_interaction(bot, user_id, trap_id, trap_team, distance):
             logger_newLog("error", "handle_trap_interaction", f"Fehler beim Erstellen des RUNNERTRAP POI")
     except Exception as e:
         logger_newLog("error", "handle_trap_interaction", f"Fehler beim Erstellen des RUNNERTRAP POI: {str(e)}")
+    
+    # 5. Sende Karte mit hervorgehobener Falle an das Team
+    try:
+        await send_trap_alert_map(bot, game_id, trap_id, trap_team, runner_lat, runner_lon, username)
+        logger_newLog("info", "handle_trap_interaction", f"Fallen-Alert-Karte an Team {trap_team} gesendet")
+    except Exception as e:
+        logger_newLog("error", "handle_trap_interaction", f"Fehler beim Senden der Fallen-Alert-Karte: {str(e)}")
 
 async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, distance):
     """Behandelt Wachturm-Interaktionen
@@ -289,4 +296,159 @@ async def handle_watchtower_interaction(bot, user_id, tower_id, tower_team, dist
         else:
             logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Erstellen des RUNNERWATCHTOWER POI")
     except Exception as e:
-        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Erstellen des RUNNERWATCHTOWER POI: {str(e)}") 
+        logger_newLog("error", "handle_watchtower_interaction", f"Fehler beim Erstellen des RUNNERWATCHTOWER POI: {str(e)}")
+
+async def send_trap_alert_map(bot, game_id, trap_id, trap_team, runner_lat, runner_lon, runner_username):
+    """Sendet eine Karte mit hervorgehobener ausgelöster Falle an das Hunter-Team"""
+    try:
+        from database import db_Game_getField, db_getTeamMembers
+        from Map import Map_GenerateGeoJSON
+        from config import conf_getMapProvider
+        from Map_SendMap_LeafletHTML import Map_SendMap_LeafletHTML
+        from Map_SendMap_pyStaticmapPNG import Map_SendMap_pyStaticmapPNG
+        
+        # Hole Spieldaten
+        game_data = db_Game_getField(game_id)
+        if not game_data:
+            logger_newLog("error", "send_trap_alert_map", f"Spiel {game_id} nicht gefunden")
+            return
+        
+        # Hole Team-Mitglieder
+        team_members = db_getTeamMembers(game_id, trap_team)
+        if not team_members:
+            logger_newLog("error", "send_trap_alert_map", f"Keine Team-Mitglieder für Team {trap_team} gefunden")
+            return
+        
+        # Erstelle spezielles GeoJSON mit hervorgehobener Falle
+        geojson = create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner_username)
+        
+        # Sende Karte an alle Team-Mitglieder
+        map_provider = conf_getMapProvider()
+        for member in team_members:
+            try:
+                if map_provider == "Leaflet-HTML":
+                    await Map_SendMap_LeafletHTML(bot, member[0], game_data, geojson, {
+                        'role': 'hunter',
+                        'username': member[1],
+                        'team': trap_team
+                    })
+                elif map_provider == "py-staticmap-PNG":
+                    await Map_SendMap_pyStaticmapPNG(bot, member[0], game_data, geojson, {
+                        'role': 'hunter',
+                        'username': member[1],
+                        'team': trap_team
+                    })
+                else:
+                    # Fallback für andere Provider
+                    from Map import Map_SendMap
+                    await Map_SendMap(bot, member[0], member[0], member[1], game_id)
+                
+                logger_newLog("info", "send_trap_alert_map", f"Fallen-Alert-Karte an {member[1]} ({member[0]}) gesendet")
+            except Exception as e:
+                logger_newLog("error", "send_trap_alert_map", f"Fehler beim Senden der Karte an {member[1]}: {str(e)}")
+                
+    except Exception as e:
+        logger_newLog("error", "send_trap_alert_map", f"Fehler beim Erstellen der Fallen-Alert-Karte: {str(e)}")
+
+def create_trap_alert_geojson(game_data, trap_id, runner_lat, runner_lon, runner_username):
+    """Erstellt ein spezielles GeoJSON für Fallen-Alert mit hervorgehobener Falle"""
+    from database import db_POI_get_by_type
+    
+    # Spielfeld-Polygon
+    field_corners = [
+        [game_data[5], game_data[4]],
+        [game_data[7], game_data[6]],
+        [game_data[9], game_data[8]],
+        [game_data[11], game_data[10]],
+        [game_data[5], game_data[4]]
+    ]
+    
+    # Ziellinie
+    finishline = [
+        [game_data[13], game_data[12]],
+        [game_data[15], game_data[14]]
+    ]
+    
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [field_corners]
+            },
+            "properties": {
+                "name": game_data[1],
+                "featuretype": "field"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": finishline
+            },
+            "properties": {
+                "featuretype": "finishline"
+            }
+        }
+    ]
+    
+    # Hole alle Fallen und finde die ausgelöste
+    game_id = game_data[0]
+    traps = db_POI_get_by_type(game_id, 'TRAP')
+    for trap in traps:
+        if trap[0] == trap_id:  # trap_id stimmt überein
+            trap_id, trap_game_id, trap_type, trap_lat, trap_lon, trap_range, trap_team, trap_creator, trap_timestamp = trap
+            
+            # Hervorgehobene Falle (größer und mit spezieller Markierung)
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [trap_lon, trap_lat]
+                },
+                "properties": {
+                    "featuretype": "TRAP_ALERT",
+                    "team": trap_team,
+                    "range": trap_range,
+                    "creator_id": trap_creator,
+                    "timestamp": trap_timestamp,
+                    "is_alert": True,
+                    "alert_message": f"Falle ausgelöst von {runner_username}!"
+                }
+            })
+            
+            # Reichweite-Kreis der Falle (hervorgehoben)
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [trap_lon, trap_lat]
+                },
+                "properties": {
+                    "featuretype": "TRAP_RANGE_ALERT",
+                    "range": trap_range,
+                    "is_alert_range": True
+                }
+            })
+            break
+    
+    # Runner-Position (hervorgehoben)
+    features.append({
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [runner_lon, runner_lat]
+        },
+        "properties": {
+            "featuretype": "RUNNER_ALERT",
+            "username": runner_username,
+            "is_alert": True,
+            "alert_message": f"Runner {runner_username} hat die Falle ausgelöst!"
+        }
+    })
+    
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    } 
