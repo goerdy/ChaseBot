@@ -218,7 +218,7 @@ def WebExport_GameData(game_id):
                 } if player[6] else None,
                 "last_seen": player[3],
                 "budget": player_budget if player_budget is not None else 0,
-                "token": player[9] if player[9] else None  # Player-Token direkt in Player-Info
+                "token": player[10] if player[10] else None  # Player-Token direkt in Player-Info (jetzt Index 10)
             }
             
             players.append(player_info)

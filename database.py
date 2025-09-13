@@ -1891,7 +1891,7 @@ def db_WebExport_getPlayersByGameId(game_id):
         
         cursor.execute('''
             SELECT user_id, username, first_name, last_seen, role, team, game_id,
-                   location_lat, location_lon, location_timestamp, created_at
+                   location_lat, location_lon, location_timestamp, player_token, created_at
             FROM users
             WHERE game_id = ?
             ORDER BY role, team, username
