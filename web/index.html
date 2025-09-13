@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChaseBot - Server Status</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .token-form {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3498db;
+        }
+
+        .token-form h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .form-field {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-field input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-field input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .server-info {
+            background: #fff;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .server-info h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .info-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .info-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .data-table {
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e9ecef;
+        }
+
+        .data-table h3 {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            border-top: 1px solid #e9ecef;
+            background: #f8f9fa;
+        }
+
+        @media (max-width: 768px) {
+            .form-group {
+                flex-direction: column;
+            }
+            
+            .form-field {
+                min-width: 100%;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Update Status Styles */
+        .update-status {
+            transition: all 0.3s ease;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .update-loading {
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #99d6ff;
+        }
+
+        .update-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .update-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Auto-refresh Indicator */
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .refresh-indicator.show {
+            opacity: 1;
+        }
+
+        /* Usage Value Styles */
+        .usage-value {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .usage-good {
+            color: #27ae60;
+        }
+
+        .usage-moderate {
+            color: #f39c12;
+        }
+
+        .usage-warning {
+            color: #e67e22;
+        }
+
+        .usage-critical {
+            color: #e74c3c;
+            animation: pulse-critical 1s infinite;
+        }
+
+        @keyframes pulse-critical {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Info Card Verbesserungen */
+        .info-card small {
+            color: #666;
+            font-size: 0.8em;
+            display: block;
+            margin-top: 2px;
+        }
+
+        /* Responsive Grid für mehr Karten */
+        @media (min-width: 1200px) {
+            .info-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1199px) and (min-width: 768px) {
+            .info-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Role Badge Styles */
+        .role-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .role-gamemaster {
+            background: #8e44ad;
+            color: white;
+        }
+
+        .role-hunter {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .role-runner {
+            background: #27ae60;
+            color: white;
+        }
+
+        .role-unknown {
+            background: #95a5a6;
+            color: white;
+        }
+
+        /* Team Badge Styles */
+        .team-badge {
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .team-red {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .team-blue {
+            background: #3498db;
+            color: white;
+        }
+
+        .team-green {
+            background: #27ae60;
+            color: white;
+        }
+
+        .team-yellow {
+            background: #f1c40f;
+            color: #2c3e50;
+        }
+
+        .team-purple {
+            background: #9b59b6;
+            color: white;
+        }
+
+        .team-other {
+            background: #34495e;
+            color: white;
+        }
+
+        .team-none {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        /* Table Verbesserungen */
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .data-table h3 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .data-table .table-count {
+            font-size: 0.8em;
+            color: #666;
+            font-weight: normal;
+        }
+        
+        .game-access {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 ChaseBot</h1>
+            <p>Server Status & Game Access</p>
+            <div id="updateStatus" class="update-status" style="display: none;"></div>
+        </div>
+
+        <div class="content">
+            <!-- Token-Eingabe Formular -->
+            <div class="token-form">
+                <h3>🔑 Game Access</h3>
+                <p style="margin-bottom: 20px; color: #666;">Gib deine Game ID und deinen Token ein, um auf Spieldaten zuzugreifen:</p>
+                
+                <div class="form-group">
+                    <div class="form-field">
+                        <label for="gameId">Game ID:</label>
+                        <input type="text" id="gameId" placeholder="z.B. 1" maxlength="10">
+                    </div>
+                    <div class="form-field">
+                        <label for="token">Token:</label>
+                        <input type="text" id="token" placeholder="z.B. ABC12345" maxlength="8" style="text-transform: uppercase;">
+                    </div>
+                    <button class="btn" onclick="accessGame()" id="accessBtn">
+                        Zugriff anfordern
+                    </button>
+                </div>
+                
+                <div id="accessMessage" style="margin-top: 15px;"></div>
+            </div>
+
+            <!-- Server Status -->
+            <div class="server-info">
+                <h3>
+                    <span class="status-indicator"></span>
+                    Server Status
+                    <button class="btn" onclick="loadServerData()" style="float: right; padding: 5px 15px; font-size: 0.9em; margin-left: 10px;">
+                        🔄 Aktualisieren
+                    </button>
+                </h3>
+                
+                <div class="info-grid" id="serverStats">
+                    <div class="info-card">
+                        <h4>Bot Name</h4>
+                        <div class="value" id="botName">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Letztes Update</h4>
+                        <div class="value" id="lastUpdate">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Aktive Spiele</h4>
+                        <div class="value" id="activeGames">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Online Spieler</h4>
+                        <div class="value" id="onlinePlayers">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>CPU Auslastung</h4>
+                        <div class="value" id="cpuUsage">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>RAM Auslastung</h4>
+                        <div class="value" id="ramUsage">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Festplatte</h4>
+                        <div class="value" id="diskUsage">Lädt...</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Uptime</h4>
+                        <div class="value" id="uptime">Lädt...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spiele-Tabelle -->
+            <div class="data-table">
+                <h3>🎮 Aktive Spiele</h3>
+                <div class="table-container">
+                    <div id="gamesContent">
+                        <div class="loading">Lade Spiele-Daten...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spieler-Tabelle -->
+            <div class="data-table">
+                <h3>👥 Alle Spieler</h3>
+                <div class="table-container">
+                    <div id="playersContent">
+                        <div class="loading">Lade Spieler-Daten...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Game-Zugang -->
+            <div class="data-table">
+                <h3>🔗 Spiel beitreten</h3>
+                <div class="game-access">
+                    <div class="input-group">
+                        <label for="gameId">Spiel ID:</label>
+                        <input type="number" id="gameId" placeholder="z.B. 1" min="1">
+                    </div>
+                    <div class="input-group">
+                        <label for="gameToken">Token:</label>
+                        <input type="text" id="gameToken" placeholder="z.B. ABC12345" maxlength="8" style="text-transform: uppercase;">
+                    </div>
+                    <button onclick="joinGame()" class="btn-primary">Spiel beitreten</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>ChaseBot Web Interface | Letztes Update: <span id="footerUpdate">-</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Globale Variablen
+        let serverData = null;
+        let lastUpdateTime = null;
+        let isUpdating = false;
+        let updateInterval = null;
+
+        // Seite laden
+        document.addEventListener('DOMContentLoaded', function() {
+            loadServerData();
+            
+            // Auto-Refresh alle 60 Sekunden
+            startAutoRefresh();
+            
+            // Token Input in Großbuchstaben
+            document.getElementById('token').addEventListener('input', function(e) {
+                e.target.value = e.target.value.toUpperCase();
+            });
+        });
+
+        // Auto-Refresh starten
+        function startAutoRefresh() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+            updateInterval = setInterval(loadServerData, 60000);
+            console.log('Auto-Refresh gestartet (alle 60 Sekunden)');
+        }
+
+        // Auto-Refresh stoppen
+        function stopAutoRefresh() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+                console.log('Auto-Refresh gestoppt');
+            }
+        }
+
+        // Server-Daten laden
+        async function loadServerData() {
+            if (isUpdating) {
+                console.log('Update bereits in Bearbeitung, überspringe...');
+                return;
+            }
+            
+            isUpdating = true;
+            showUpdateStatus('Lade Server-Daten...', 'loading');
+            
+            try {
+                // Lade JSON-Daten
+                const response = await fetch('ChaseBotServer.json?' + new Date().getTime());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const jsonData = await response.json();
+                console.log('JSON-Daten geladen:', jsonData);
+                
+                serverData = jsonData;
+                updateServerStatsFromJSON();
+                updateGamesTableFromJSON();
+                updatePlayersTableFromJSON();
+                
+                updateFooter();
+                
+                showUpdateStatus('Daten erfolgreich aktualisiert', 'success');
+                lastUpdateTime = new Date();
+                
+                // Starte Countdown für nächstes Update
+                setTimeout(() => {
+                    showNextUpdateCountdown();
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Fehler beim Laden der Server-Daten:', error);
+                showUpdateStatus('Fehler beim Laden der Daten: ' + error.message, 'error');
+                
+                // Zeige Fehlermeldung in beiden Tabellen
+                document.getElementById('gamesContent').innerHTML = `<div class="error">Fehler beim Laden der Spiele-Daten: ${error.message}</div>`;
+                document.getElementById('playersContent').innerHTML = `<div class="error">Fehler beim Laden der Spieler-Daten: ${error.message}</div>`;
+            } finally {
+                isUpdating = false;
+            }
+        }
+
+        // CSV parsen
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n');
+            const data = {
+                serverInfo: {},
+                games: [],
+                users: []
+            };
+            
+            let currentSection = null;
+            
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+                
+                const columns = line.split(',');
+                
+                // Sektionen erkennen
+                if (columns[0] === 'Category' && columns[1] === 'Key') {
+                    currentSection = 'serverInfo';
+                    continue;
+                } else if (columns[0] === 'Game ID' && columns[1] === 'Game Name') {
+                    currentSection = 'games';
+                    continue;
+                } else if (columns[0] === 'User ID' && columns[1] === 'Username') {
+                    currentSection = 'users';
+                    continue;
+                }
+                
+                // Daten verarbeiten
+                if (currentSection === 'serverInfo' && columns.length >= 3) {
+                    const key = columns[1];
+                    const value = columns[2];
+                    data.serverInfo[key] = value;
+                } else if (currentSection === 'games' && columns.length >= 5) {
+                    data.games.push({
+                        id: columns[0],
+                        name: columns[1],
+                        status: columns[2],
+                        players: columns[3],
+                        created: columns[4]
+                    });
+                } else if (currentSection === 'users' && columns.length >= 7) {
+                    data.users.push({
+                        id: columns[0],
+                        username: columns[1],
+                        role: columns[2],
+                        team: columns[3],
+                        gameId: columns[4],
+                        lastSeen: columns[5],
+                        lastLocation: columns[6]
+                    });
+                }
+            }
+            
+            return data;
+        }
+
+        // Server-Statistiken aktualisieren (JSON)
+        function updateServerStatsFromJSON() {
+            if (!serverData || !serverData.bot) return;
+            
+            // Grundlegende Bot-Informationen
+            document.getElementById('botName').textContent = serverData.bot.name || 'Unbekannt';
+            document.getElementById('lastUpdate').textContent = formatTimestamp(serverData.bot.timestamp);
+            document.getElementById('activeGames').textContent = serverData.bot.stats?.active_games || 0;
+            document.getElementById('onlinePlayers').textContent = serverData.bot.stats?.online_players || 0;
+            
+            // System-Informationen
+            const system = serverData.bot.system;
+            if (system) {
+                // CPU Auslastung
+                const cpuPercent = system.cpu_percent || 0;
+                document.getElementById('cpuUsage').innerHTML = 
+                    `<span class="usage-value ${getUsageClass(cpuPercent)}">${cpuPercent.toFixed(1)}%</span>`;
+                
+                // RAM Auslastung
+                const ramPercent = system.ram?.percent || 0;
+                const ramUsed = system.ram?.used_gb || 0;
+                const ramTotal = system.ram?.total_gb || 0;
+                document.getElementById('ramUsage').innerHTML = 
+                    `<span class="usage-value ${getUsageClass(ramPercent)}">${ramPercent.toFixed(1)}%</span><br>
+                     <small>${ramUsed.toFixed(1)} GB / ${ramTotal.toFixed(1)} GB</small>`;
+                
+                // Festplatten-Auslastung
+                const diskPercent = system.disk?.percent || 0;
+                const diskUsed = system.disk?.used_gb || 0;
+                const diskTotal = system.disk?.total_gb || 0;
+                document.getElementById('diskUsage').innerHTML = 
+                    `<span class="usage-value ${getUsageClass(diskPercent)}">${diskPercent.toFixed(1)}%</span><br>
+                     <small>${diskUsed.toFixed(1)} GB / ${diskTotal.toFixed(1)} GB</small>`;
+                
+                // Uptime
+                const uptimeHours = system.uptime_hours || 0;
+                const uptimeDays = Math.floor(uptimeHours / 24);
+                const uptimeHoursRemainder = Math.floor(uptimeHours % 24);
+                let uptimeText = '';
+                if (uptimeDays > 0) {
+                    uptimeText = `${uptimeDays}d ${uptimeHoursRemainder}h`;
+                } else {
+                    uptimeText = `${uptimeHoursRemainder}h`;
+                }
+                document.getElementById('uptime').textContent = uptimeText;
+            }
+        }
+
+        // Server-Statistiken aktualisieren (CSV - Fallback)
+        function updateServerStats() {
+            if (!serverData) return;
+            
+            document.getElementById('botName').textContent = serverData.serverInfo['Bot Name'] || 'Unbekannt';
+            document.getElementById('lastUpdate').textContent = formatTimestamp(serverData.serverInfo['Timestamp']);
+            document.getElementById('activeGames').textContent = serverData.games.filter(g => g.status === 'running' || g.status === 'headstart').length;
+            document.getElementById('onlinePlayers').textContent = serverData.users.filter(u => isRecent(u.lastSeen)).length;
+        }
+
+        // Spiele-Tabelle aktualisieren (JSON)
+        function updateGamesTableFromJSON() {
+            if (!serverData || !serverData.games) return;
+            
+            // Update Tabellen-Überschrift mit Anzahl (nur wenn Element existiert)
+            const gamesHeader = document.querySelector('#gamesContent')?.parentElement?.querySelector('h3');
+            if (gamesHeader) {
+                gamesHeader.innerHTML = `🎮 Aktive Spiele <span class="table-count">(${serverData.games.length} Spiele)</span>`;
+            }
+            
+            let html = '<table><thead><tr>';
+            html += '<th>Spiel ID</th><th>Name</th><th>Status</th><th>Spieler</th><th>Gamemaster</th><th>Erstellt</th>';
+            html += '</tr></thead><tbody>';
+            
+            serverData.games.forEach(game => {
+                const statusClass = getStatusClass(game.status);
+                html += `<tr>
+                    <td>${game.game_id}</td>
+                    <td>${game.name}</td>
+                    <td><span class="status-badge ${statusClass}">${game.status}</span></td>
+                    <td>${game.players_count}</td>
+                    <td>${game.gamemaster_id}</td>
+                    <td>${formatTimestamp(game.created_at)}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('gamesContent').innerHTML = html;
+        }
+
+        // Spieler-Tabelle aktualisieren (JSON)
+        function updatePlayersTableFromJSON() {
+            if (!serverData || !serverData.players) return;
+            
+            // Update Tabellen-Überschrift mit Anzahl (nur wenn Element existiert)
+            const playersHeader = document.querySelector('#playersContent')?.parentElement?.querySelector('h3');
+            if (playersHeader) {
+                playersHeader.innerHTML = `👥 Alle Spieler <span class="table-count">(${serverData.players.length} Spieler)</span>`;
+            }
+            
+            let html = '<table><thead><tr>';
+            html += '<th>User ID</th><th>Username</th><th>Rolle</th><th>Team</th><th>Spiel ID</th><th>Letztes Update</th><th>Standort</th>';
+            html += '</tr></thead><tbody>';
+            
+            serverData.players.forEach(player => {
+                const roleClass = getRoleClass(player.role);
+                const teamClass = getTeamClass(player.team);
+                const locationIcon = player.has_location ? '📍' : '❌';
+                const lastSeen = formatTimestamp(player.last_seen);
+                const lastLocation = player.last_location_update ? formatTimestamp(player.last_location_update) : 'Nie';
+                
+                html += `<tr>
+                    <td>${player.user_id}</td>
+                    <td>${player.username || player.first_name || 'Unbekannt'}</td>
+                    <td><span class="role-badge ${roleClass}">${player.role}</span></td>
+                    <td><span class="team-badge ${teamClass}">${player.team || '-'}</span></td>
+                    <td>${player.game_id || '-'}</td>
+                    <td>${lastSeen}</td>
+                    <td>${locationIcon} ${lastLocation}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('playersContent').innerHTML = html;
+        }
+
+        // Daten-Tabelle aktualisieren (CSV - Fallback)
+        function updateDataTable() {
+            if (!serverData) return;
+            
+            let html = '<table><thead><tr>';
+            html += '<th>Spiel ID</th><th>Name</th><th>Status</th><th>Spieler</th><th>Erstellt</th>';
+            html += '</tr></thead><tbody>';
+            
+            serverData.games.forEach(game => {
+                const statusClass = getStatusClass(game.status);
+                html += `<tr>
+                    <td>${game.id}</td>
+                    <td>${game.name}</td>
+                    <td><span class="status-badge ${statusClass}">${game.status}</span></td>
+                    <td>${game.players}</td>
+                    <td>${formatTimestamp(game.created)}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('dataContent').innerHTML = html;
+        }
+
+        // Footer aktualisieren
+        function updateFooter() {
+            const now = new Date();
+            document.getElementById('footerUpdate').textContent = now.toLocaleString('de-DE');
+        }
+
+        // Game Access
+        function accessGame() {
+            const gameId = document.getElementById('gameId').value.trim();
+            const token = document.getElementById('token').value.trim();
+            
+            if (!gameId || !token) {
+                showMessage('Bitte gib Game ID und Token ein.', 'error');
+                return;
+            }
+            
+            if (token.length !== 8) {
+                showMessage('Token muss 8 Zeichen lang sein.', 'error');
+                return;
+            }
+            
+            // TODO: Implementierung der GameData-Ansicht
+            showMessage(`Game Access für Spiel ${gameId} mit Token ${token} - Feature noch nicht implementiert.`, 'success');
+        }
+
+        // Hilfsfunktionen
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            try {
+                return new Date(timestamp).toLocaleString('de-DE');
+            } catch {
+                return timestamp;
+            }
+        }
+
+        function isRecent(timestamp) {
+            if (!timestamp) return false;
+            try {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffMinutes = (now - date) / (1000 * 60);
+                return diffMinutes <= 5; // Letzte 5 Minuten
+            } catch {
+                return false;
+            }
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'running': return 'status-running';
+                case 'headstart': return 'status-headstart';
+                case 'created': return 'status-created';
+                case 'ended': return 'status-ended';
+                default: return 'status-unknown';
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('accessMessage');
+            messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        function showError(message) {
+            document.getElementById('dataContent').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Usage-Klasse basierend auf Auslastung
+        function getUsageClass(percent) {
+            if (percent >= 90) return 'usage-critical';
+            if (percent >= 70) return 'usage-warning';
+            if (percent >= 50) return 'usage-moderate';
+            return 'usage-good';
+        }
+
+        // Rolle-Klasse für Badges
+        function getRoleClass(role) {
+            switch (role) {
+                case 'gamemaster': return 'role-gamemaster';
+                case 'hunter': return 'role-hunter';
+                case 'runner': return 'role-runner';
+                default: return 'role-unknown';
+            }
+        }
+
+        // Team-Klasse für Badges
+        function getTeamClass(team) {
+            if (!team) return 'team-none';
+            switch (team.toLowerCase()) {
+                case 'red': return 'team-red';
+                case 'blue': return 'team-blue';
+                case 'green': return 'team-green';
+                case 'yellow': return 'team-yellow';
+                case 'purple': return 'team-purple';
+                default: return 'team-other';
+            }
+        }
+
+        // Update-Status anzeigen
+        function showUpdateStatus(message, type) {
+            const statusElement = document.getElementById('updateStatus');
+            statusElement.textContent = message;
+            statusElement.className = `update-status update-${type}`;
+            statusElement.style.display = 'block';
+            
+            // Auto-hide nach 3 Sekunden (außer bei Fehlern)
+            if (type !== 'error') {
+                setTimeout(() => {
+                    if (statusElement.textContent === message) {
+                        statusElement.style.opacity = '0';
+                        setTimeout(() => {
+                            statusElement.style.display = 'none';
+                            statusElement.style.opacity = '1';
+                        }, 500);
+                    }
+                }, 3000);
+            }
+        }
+
+        // Nächster Update-Countdown
+        function showNextUpdateCountdown() {
+            let seconds = 60;
+            const countdown = setInterval(() => {
+                const statusElement = document.getElementById('updateStatus');
+                if (statusElement.style.display === 'none' || statusElement.textContent.includes('Lade')) {
+                    clearInterval(countdown);
+                    return;
+                }
+                
+                statusElement.textContent = `Nächstes Update in ${seconds} Sekunden...`;
+                seconds--;
+                
+                if (seconds < 0) {
+                    clearInterval(countdown);
+                }
+            }, 1000);
+        }
+        
+        // Game beitreten Funktion
+        function joinGame() {
+            const gameId = document.getElementById('gameId').value;
+            const token = document.getElementById('gameToken').value.toUpperCase();
+            
+            if (!gameId || !token) {
+                alert('Bitte Spiel ID und Token eingeben!');
+                return;
+            }
+            
+            if (token.length !== 8) {
+                alert('Token muss 8 Zeichen lang sein!');
+                return;
+            }
+            
+            // Weiterleitung zur Game-Ansicht
+            window.open(`game.php?id=${gameId}&token=${token}`, '_blank');
+        }
+        
+        // Enter-Taste für Token-Eingabe
+        document.getElementById('gameToken').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinGame();
+            }
+        });
+    </script>
+
+</body>
+</html>

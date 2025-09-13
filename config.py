@@ -178,4 +178,33 @@ def conf_getTileCacheMaxSize():
     try:
         return int(value)
     except ValueError:
-        return 1000 
+        return 1000
+
+# Web Export Einstellungen
+def conf_getWebExportEnabled():
+    """Gibt zurück ob Web Export aktiviert ist"""
+    return os.getenv('WEBEXPORT_ENABLED', 'false').lower() == 'true'
+
+def conf_getWebExportFtpHost():
+    """Gibt den FTP Host zurück"""
+    return os.getenv('WEBEXPORT_FTP_HOST', '')
+
+def conf_getWebExportFtpUser():
+    """Gibt den FTP Benutzernamen zurück"""
+    return os.getenv('WEBEXPORT_FTP_USER', '')
+
+def conf_getWebExportFtpPass():
+    """Gibt das FTP Passwort zurück"""
+    return os.getenv('WEBEXPORT_FTP_PASS', '')
+
+def conf_getWebExportFtpPath():
+    """Gibt den FTP Pfad zurück"""
+    return os.getenv('WEBEXPORT_FTP_PATH', '/maps/')
+
+def conf_getWebExportUpdateInterval():
+    """Gibt das Update-Intervall in Sekunden zurück"""
+    value = os.getenv('WEBEXPORT_UPDATE_INTERVAL', '60')
+    try:
+        return int(value)
+    except ValueError:
+        return 60 

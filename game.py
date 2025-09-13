@@ -2,7 +2,7 @@ import asyncio
 from logger import logger_newLog
 from database import db_getUsers, db_getGamesWithStatus, db_Game_getStartTime, db_Game_getDuration, db_Game_setStatus, db_getHunters, db_getRunners, db_Game_getField
 from datetime import datetime, timedelta
-from config import conf_getMaxLocationAgeMinutes
+from config import conf_getMaxLocationAgeMinutes, conf_getWebExportEnabled, conf_getWebExportUpdateInterval
 from time import time
 
 async def game_updateLocations():
@@ -71,11 +71,56 @@ async def check_player_locations(game_id):
 
 async def game_Scheduler():
     last_location_check = 0
+    last_webexport = time()  # Startzeit setzen, damit erster Export nicht sofort passiert
     while True:
         logger_newLog("debug", "game_Scheduler", "Scheduler läuft")
         
         # Führe Standort-Updates aus
         await game_updateLocations()
+        
+        # WebExport prüfen (nur wenn aktiviert)
+        now_ts = time()
+        if conf_getWebExportEnabled():
+            webexport_interval = conf_getWebExportUpdateInterval()
+            if now_ts - last_webexport >= webexport_interval:
+                try:
+                    from WebExport import WebExport_ServerData, WebExport_GameData
+                    logger_newLog("info", "game_Scheduler", f"Starte WebExport (Intervall: {webexport_interval}s)")
+                    
+                    # ServerData exportieren
+                    server_success = WebExport_ServerData()
+                    if server_success:
+                        logger_newLog("info", "game_Scheduler", "✅ ServerData-Export erfolgreich")
+                    else:
+                        logger_newLog("error", "game_Scheduler", "❌ ServerData-Export fehlgeschlagen")
+                    
+                    # GameData für alle laufenden Spiele exportieren
+                    headstart_games = db_getGamesWithStatus("headstart")
+                    running_games = db_getGamesWithStatus("running")
+                    all_active_games = headstart_games + running_games
+                    
+                    game_export_success = True
+                    for game in all_active_games:
+                        game_id = game[0]
+                        if WebExport_GameData(game_id):
+                            logger_newLog("debug", "game_Scheduler", f"✅ GameData für Spiel {game_id} exportiert")
+                        else:
+                            logger_newLog("error", "game_Scheduler", f"❌ GameData für Spiel {game_id} fehlgeschlagen")
+                            game_export_success = False
+                    
+                    if server_success and game_export_success:
+                        logger_newLog("info", "game_Scheduler", "✅ WebExport (ServerData + GameData) erfolgreich abgeschlossen")
+                    else:
+                        logger_newLog("warning", "game_Scheduler", "⚠️ WebExport teilweise fehlgeschlagen")
+                    
+                    last_webexport = now_ts
+                except Exception as e:
+                    logger_newLog("error", "game_Scheduler", f"❌ Fehler beim WebExport: {str(e)}")
+                    last_webexport = now_ts  # Trotzdem Zeitstempel setzen, um nicht in Endlosschleife zu geraten
+        else:
+            # Nur einmal loggen, dass WebExport deaktiviert ist
+            if last_webexport == 0:
+                logger_newLog("info", "game_Scheduler", "WebExport ist deaktiviert (WEBEXPORT_ENABLED=false)")
 
         # --- NEU: Laufende Spiele prüfen ---
         # Prüfe Spiele mit Status 'headstart' oder 'running'

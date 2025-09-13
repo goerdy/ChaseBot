@@ -25,6 +25,7 @@ def db_init():
                 location_lat REAL,
                 location_lon REAL,
                 location_timestamp TIMESTAMP,
+                player_token TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
@@ -41,6 +42,7 @@ def db_init():
                 start_time TIMESTAMP,
                 duration_minutes INTEGER,
                 runner_headstart_minutes INTEGER,
+                gamemaster_token TEXT,
                 -- Spielfeld-Ecken (Rechteck)
                 field_corner1_lat REAL,
                 field_corner1_lon REAL,
@@ -129,6 +131,19 @@ def db_init():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (game_id) REFERENCES games(game_id),
                 FOREIGN KEY (creator_id) REFERENCES users(user_id)
+            )
+        ''')
+        
+        # Erstelle team_tokens Tabelle
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS team_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                team TEXT NOT NULL,
+                token TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES games(game_id),
+                UNIQUE(game_id, team)
             )
         ''')
         
@@ -1602,6 +1617,374 @@ def db_POI_get_by_type(game_id, poi_type):
     except Exception as e:
         logger_newLog("error", "db_POI_get_by_type", f"Fehler beim Holen der POIs: {str(e)}")
         return []
+    finally:
+        if conn:
+            conn.close()
+
+# Token Getter/Setter-Funktionen
+def db_Game_setGamemasterToken(game_id, token):
+    """Setzt den Gamemaster-Token für ein Spiel"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE games 
+            SET gamemaster_token = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE game_id = ?
+        ''', (token, game_id))
+        
+        conn.commit()
+        logger_newLog("debug", "db_Game_setGamemasterToken", f"Gamemaster-Token für Spiel {game_id} gesetzt")
+        return True
+    except Exception as e:
+        logger_newLog("error", "db_Game_setGamemasterToken", f"Fehler beim Setzen des Gamemaster-Tokens: {str(e)}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def db_Game_getGamemasterToken(game_id):
+    """Holt den Gamemaster-Token für ein Spiel"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT gamemaster_token FROM games WHERE game_id = ?
+        ''', (game_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+    except Exception as e:
+        logger_newLog("error", "db_Game_getGamemasterToken", f"Fehler beim Holen des Gamemaster-Tokens: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def db_User_setPlayerToken(user_id, token):
+    """Setzt den Player-Token für einen User"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE users 
+            SET player_token = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+        ''', (token, user_id))
+        
+        conn.commit()
+        logger_newLog("debug", "db_User_setPlayerToken", f"Player-Token für User {user_id} gesetzt")
+        return True
+    except Exception as e:
+        logger_newLog("error", "db_User_setPlayerToken", f"Fehler beim Setzen des Player-Tokens: {str(e)}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def db_User_getPlayerToken(user_id):
+    """Holt den Player-Token für einen User"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT player_token FROM users WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+    except Exception as e:
+        logger_newLog("error", "db_User_getPlayerToken", f"Fehler beim Holen des Player-Tokens: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def db_TeamToken_set(game_id, team, token):
+    """Setzt einen Team-Token"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO team_tokens (game_id, team, token)
+            VALUES (?, ?, ?)
+        ''', (game_id, team, token))
+        
+        conn.commit()
+        logger_newLog("debug", "db_TeamToken_set", f"Team-Token für Spiel {game_id}, Team {team} gesetzt")
+        return True
+    except Exception as e:
+        logger_newLog("error", "db_TeamToken_set", f"Fehler beim Setzen des Team-Tokens: {str(e)}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def db_TeamToken_get(game_id, team):
+    """Holt einen Team-Token"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT token FROM team_tokens WHERE game_id = ? AND team = ?
+        ''', (game_id, team))
+        
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+    except Exception as e:
+        logger_newLog("error", "db_TeamToken_get", f"Fehler beim Holen des Team-Tokens: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def db_TeamToken_getAllForGame(game_id):
+    """Holt alle Team-Tokens für ein Spiel"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT team, token FROM team_tokens WHERE game_id = ?
+            ORDER BY team
+        ''', (game_id,))
+        
+        results = cursor.fetchall()
+        return results
+    except Exception as e:
+        logger_newLog("error", "db_TeamToken_getAllForGame", f"Fehler beim Holen der Team-Tokens: {str(e)}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+# WebExport Getter-Funktionen
+def db_WebExport_getAllGames():
+    """Holt alle Spiele für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT game_id, name, gamemaster_id, status, start_time, duration_minutes, 
+                   created_at, updated_at
+            FROM games
+            ORDER BY created_at DESC
+        ''')
+        
+        games = cursor.fetchall()
+        logger_newLog("debug", "db_WebExport_getAllGames", f"{len(games)} Spiele für WebExport gefunden")
+        return games
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getAllGames", f"Fehler beim Holen aller Spiele: {str(e)}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getAllPlayers():
+    """Holt alle Spieler für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT user_id, username, first_name, last_seen, role, team, game_id,
+                   location_lat, location_lon, location_timestamp, created_at
+            FROM users
+            ORDER BY last_seen DESC
+        ''')
+        
+        players = cursor.fetchall()
+        logger_newLog("debug", "db_WebExport_getAllPlayers", f"{len(players)} Spieler für WebExport gefunden")
+        return players
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getAllPlayers", f"Fehler beim Holen aller Spieler: {str(e)}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getGameById(game_id):
+    """Holt ein spezifisches Spiel für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT game_id, name, gamemaster_id, status, start_time, duration_minutes,
+                   runner_headstart_minutes, created_at, updated_at
+            FROM games
+            WHERE game_id = ?
+        ''', (game_id,))
+        
+        game = cursor.fetchone()
+        if game:
+            logger_newLog("debug", "db_WebExport_getGameById", f"Spiel {game_id} für WebExport gefunden")
+        else:
+            logger_newLog("warning", "db_WebExport_getGameById", f"Spiel {game_id} nicht gefunden")
+        return game
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getGameById", f"Fehler beim Holen des Spiels {game_id}: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getPlayersByGameId(game_id):
+    """Holt alle Spieler eines spezifischen Spiels für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT user_id, username, first_name, last_seen, role, team, game_id,
+                   location_lat, location_lon, location_timestamp, created_at
+            FROM users
+            WHERE game_id = ?
+            ORDER BY role, team, username
+        ''', (game_id,))
+        
+        players = cursor.fetchall()
+        logger_newLog("debug", "db_WebExport_getPlayersByGameId", f"{len(players)} Spieler für Spiel {game_id} gefunden")
+        return players
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getPlayersByGameId", f"Fehler beim Holen der Spieler für Spiel {game_id}: {str(e)}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getPOIsByGameId(game_id):
+    """Holt alle POIs eines spezifischen Spiels für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, game_id, type, lat, lon, range_meters, team, creator_id, timestamp
+            FROM poi
+            WHERE game_id = ?
+            ORDER BY timestamp DESC
+        ''', (game_id,))
+        
+        pois = cursor.fetchall()
+        logger_newLog("debug", "db_WebExport_getPOIsByGameId", f"{len(pois)} POIs für Spiel {game_id} gefunden")
+        return pois
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getPOIsByGameId", f"Fehler beim Holen der POIs für Spiel {game_id}: {str(e)}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getGameField(game_id):
+    """Holt Spielfeld-Daten eines Spiels für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT field_corner1_lat, field_corner1_lon, field_corner2_lat, field_corner2_lon,
+                   field_corner3_lat, field_corner3_lon, field_corner4_lat, field_corner4_lon,
+                   finish_line1_lat, finish_line1_lon, finish_line2_lat, finish_line2_lon
+            FROM games
+            WHERE game_id = ?
+        ''', (game_id,))
+        
+        field = cursor.fetchone()
+        if field:
+            logger_newLog("debug", "db_WebExport_getGameField", f"Spielfeld für Spiel {game_id} gefunden")
+        else:
+            logger_newLog("warning", "db_WebExport_getGameField", f"Spielfeld für Spiel {game_id} nicht gefunden")
+        return field
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getGameField", f"Fehler beim Holen des Spielfelds für Spiel {game_id}: {str(e)}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getActiveGamesCount():
+    """Holt Anzahl aktiver Spiele für WebExport"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM games 
+            WHERE status IN ('headstart', 'running')
+        ''')
+        
+        count = cursor.fetchone()[0]
+        logger_newLog("debug", "db_WebExport_getActiveGamesCount", f"{count} aktive Spiele gefunden")
+        return count
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getActiveGamesCount", f"Fehler beim Zählen aktiver Spiele: {str(e)}")
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+def db_WebExport_getOnlinePlayersCount():
+    """Holt Anzahl online Spieler für WebExport (letzte 5 Minuten)"""
+    conn = None
+    try:
+        db_file = conf_getDatabaseFile()
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM users 
+            WHERE last_seen > datetime('now', '-5 minutes')
+        ''')
+        
+        count = cursor.fetchone()[0]
+        logger_newLog("debug", "db_WebExport_getOnlinePlayersCount", f"{count} online Spieler gefunden")
+        return count
+    except Exception as e:
+        logger_newLog("error", "db_WebExport_getOnlinePlayersCount", f"Fehler beim Zählen online Spieler: {str(e)}")
+        return 0
     finally:
         if conn:
             conn.close() 

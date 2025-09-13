@@ -28,6 +28,22 @@ class TelegramBot:
             logger_newLog("error", "get_updates", f"Fehler beim Abrufen der Updates: {str(e)}")
             return []
     
+    async def get_bot_info(self):
+        """Holt Bot-Informationen von der Telegram API"""
+        try:
+            url = f"{self.base_url}/getMe"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get('ok'):
+                            return data.get('result')
+            return None
+        except Exception as e:
+            logger_newLog("error", "get_bot_info", f"Fehler beim Abrufen der Bot-Informationen: {str(e)}")
+            return None
+    
     async def handle_command(self, message):
         """Behandelt eingehende Befehle und Nachrichten"""
         chat_id = message['chat']['id']

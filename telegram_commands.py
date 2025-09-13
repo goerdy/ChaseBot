@@ -760,8 +760,8 @@ async def cmd_shop(bot, chat_id, user_id, username, command_text):
                              db_Game_getRunnerShop4price, db_Game_getRunnerShop4amount)
         
         items = [
-            (1, "Runner Item 1", db_Game_getRunnerShop1price(game_id), db_Game_getRunnerShop1amount(game_id)),
-            (2, "Runner Item 2", db_Game_getRunnerShop2price(game_id), db_Game_getRunnerShop2amount(game_id)),
+            (1, "Radar Ping", db_Game_getRunnerShop1price(game_id), db_Game_getRunnerShop1amount(game_id)),
+            (2, "Radar Stealth Mode", db_Game_getRunnerShop2price(game_id), db_Game_getRunnerShop2amount(game_id)),
             (3, "Runner Item 3", db_Game_getRunnerShop3price(game_id), db_Game_getRunnerShop3amount(game_id)),
             (4, "Runner Item 4", db_Game_getRunnerShop4price(game_id), db_Game_getRunnerShop4amount(game_id))
         ]
@@ -772,9 +772,9 @@ async def cmd_shop(bot, chat_id, user_id, username, command_text):
                              db_Game_getHunterShop4price, db_Game_getHunterShop4amount)
         
         items = [
-            (1, "Hunter Item 1", db_Game_getHunterShop1price(game_id), db_Game_getHunterShop1amount(game_id)),
-            (2, "Hunter Item 2", db_Game_getHunterShop2price(game_id), db_Game_getHunterShop2amount(game_id)),
-            (3, "Hunter Item 3", db_Game_getHunterShop3price(game_id), db_Game_getHunterShop3amount(game_id)),
+            (1, "TRAP", db_Game_getHunterShop1price(game_id), db_Game_getHunterShop1amount(game_id)),
+            (2, "Watchtower", db_Game_getHunterShop2price(game_id), db_Game_getHunterShop2amount(game_id)),
+            (3, "Radar Ping", db_Game_getHunterShop3price(game_id), db_Game_getHunterShop3amount(game_id)),
             (4, "Hunter Item 4", db_Game_getHunterShop4price(game_id), db_Game_getHunterShop4amount(game_id))
         ]
     
@@ -1307,6 +1307,22 @@ async def cmd_startgame(bot, chat_id, user_id, username, command_text):
                 teams_created.add(team)
         
         logger_newLog("info", "cmd_startgame", f"Wallets erstellt: {len(runners)} Runner, {len(teams_created)} Teams")
+        
+        # Generiere Tokens für alle Spieler
+        from WebExport import generate_game_tokens
+        if generate_game_tokens(game_id):
+            logger_newLog("info", "cmd_startgame", f"✅ Tokens für Spiel {game_id} erfolgreich generiert")
+        else:
+            logger_newLog("error", "cmd_startgame", f"❌ Fehler beim Generieren der Tokens für Spiel {game_id}")
+            await bot.send_message(chat_id, "⚠️ Spiel gestartet, aber Fehler beim Generieren der Web-Tokens.")
+        
+        # Exportiere GameData beim Spielstart
+        from WebExport import WebExport_GameData
+        if WebExport_GameData(game_id):
+            logger_newLog("info", "cmd_startgame", f"✅ GameData für Spiel {game_id} erfolgreich exportiert")
+        else:
+            logger_newLog("error", "cmd_startgame", f"❌ Fehler beim GameData-Export für Spiel {game_id}")
+            await bot.send_message(chat_id, "⚠️ Spiel gestartet, aber Fehler beim Web-Export.")
         
         # Hole alle Runner und Hunter
         from database import db_getRunners, db_getHunters
