@@ -49,7 +49,8 @@ def conf_checkconfig():
         return False
     
     # Prüfe ob API Key plausibel ist (sollte Zahlen und Buchstaben enthalten)
-    if not api_key.replace(':', '').replace('_', '').isalnum():
+    # Telegram API Keys können :, _ und - enthalten
+    if not api_key.replace(':', '').replace('_', '').replace('-', '').isalnum():
         return False
     
     # Prüfe ob Admin Name plausibel ist (sollte alphanumerisch sein)
