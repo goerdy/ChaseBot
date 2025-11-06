@@ -147,10 +147,41 @@
             animation: pulse 2s infinite;
         }
 
+        .status-indicator.online {
+            background: #27ae60;
+        }
+
+        .status-indicator.warning {
+            background: #f39c12;
+        }
+
+        .status-indicator.offline {
+            background: #e74c3c;
+            animation: pulse-critical 1s infinite;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
             100% { opacity: 1; }
+        }
+
+        .status-text {
+            font-size: 0.9em;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+
+        .status-text.online {
+            color: #27ae60;
+        }
+
+        .status-text.warning {
+            color: #f39c12;
+        }
+
+        .status-text.offline {
+            color: #e74c3c;
         }
 
         .info-grid {
@@ -539,6 +570,7 @@
                 <h3>
                     <span class="status-indicator"></span>
                     Server Status
+                    <span class="status-text" id="serverStatusText">Online</span>
                     <button class="btn" onclick="loadServerData()" style="float: right; padding: 5px 15px; font-size: 0.9em; margin-left: 10px;">
                         🔄 Aktualisieren
                     </button>
@@ -634,6 +666,9 @@
             }
             updateInterval = setInterval(loadServerData, 60000);
             console.log('Auto-Refresh gestartet (alle 60 Sekunden)');
+            
+            // Status-Check alle 10 Sekunden (ohne neue Daten zu laden)
+            setInterval(updateServerStatus, 10000);
         }
 
         // Auto-Refresh stoppen
@@ -684,6 +719,10 @@
             } catch (error) {
                 console.error('Fehler beim Laden der Server-Daten:', error);
                 showUpdateStatus('Fehler beim Laden der Daten: ' + error.message, 'error');
+                
+                // Server-Status auf Offline setzen
+                serverData = null;
+                updateServerStatus();
                 
                 // Zeige Fehlermeldung in beiden Tabellen
                 document.getElementById('gamesContent').innerHTML = `<div class="error">Fehler beim Laden der Spiele-Daten: ${error.message}</div>`;
@@ -751,15 +790,58 @@
             return data;
         }
 
+        // Server-Status basierend auf letztem Update prüfen
+        function updateServerStatus() {
+            const statusIndicator = document.querySelector('.status-indicator');
+            const statusText = document.getElementById('serverStatusText');
+            
+            if (!serverData || !serverData.bot || !serverData.bot.timestamp) {
+                // Keine Daten verfügbar = Offline
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = 'Server nicht verfügbar';
+                statusText.className = 'status-text offline';
+                return;
+            }
+            
+            // Prüfe wie lange das letzte Update zurückliegt
+            const lastUpdate = new Date(serverData.bot.timestamp);
+            const now = new Date();
+            const diffMinutes = (now - lastUpdate) / (1000 * 60);
+            
+            if (diffMinutes <= 2) {
+                // < 2 Minuten = Online
+                statusIndicator.className = 'status-indicator online';
+                statusText.textContent = 'Online';
+                statusText.className = 'status-text online';
+            } else if (diffMinutes <= 5) {
+                // 2-5 Minuten = Warnung
+                statusIndicator.className = 'status-indicator warning';
+                statusText.textContent = `Warnung (${Math.floor(diffMinutes)} Min alt)`;
+                statusText.className = 'status-text warning';
+            } else {
+                // > 5 Minuten = Offline
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = `Offline (${Math.floor(diffMinutes)} Min alt)`;
+                statusText.className = 'status-text offline';
+            }
+        }
+
         // Server-Statistiken aktualisieren (JSON)
         function updateServerStatsFromJSON() {
-            if (!serverData || !serverData.bot) return;
+            if (!serverData || !serverData.bot) {
+                // Keine Daten = Offline
+                updateServerStatus();
+                return;
+            }
             
             // Grundlegende Bot-Informationen
             document.getElementById('botName').textContent = serverData.bot.name || 'Unbekannt';
             document.getElementById('lastUpdate').textContent = formatTimestamp(serverData.bot.timestamp);
             document.getElementById('activeGames').textContent = serverData.bot.stats?.active_games || 0;
             document.getElementById('onlinePlayers').textContent = serverData.bot.stats?.online_players || 0;
+            
+            // Server-Status aktualisieren
+            updateServerStatus();
             
             // System-Informationen
             const system = serverData.bot.system;
