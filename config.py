@@ -179,7 +179,7 @@ def conf_getTileCacheMaxSize():
     try:
         return int(value)
     except ValueError:
-        return 1000
+        return 1000 
 
 # Web Export Einstellungen
 def conf_getWebExportEnabled():

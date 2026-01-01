@@ -711,7 +711,7 @@ async def cmd_shop(bot, chat_id, user_id, username, command_text):
     if role == 'hunter':
         if game_status == 'headstart':
             await bot.send_message(chat_id, "⏳ Der Shop ist für Hunter noch nicht verfügbar.\n🦌 Runner haben noch Headstart - warte bis das Spiel richtig beginnt!")
-            return
+        return
     
     # Spezielle Ansicht für Gamemaster
     if role == 'gamemaster':
@@ -987,7 +987,7 @@ async def cmd_buy(bot, chat_id, user_id, username, command_text):
     if role == 'hunter':
         if game_status == 'headstart':
             await bot.send_message(chat_id, "⏳ Der Shop ist für Hunter noch nicht verfügbar.\n🦌 Runner haben noch Headstart - warte bis das Spiel richtig beginnt!")
-            return
+        return
     
     # Hole Wallet
     from database import db_Wallet_get
